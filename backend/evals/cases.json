@@ -1,0 +1,5 @@
+[
+  {"name":"best_role","question":"Which role is my best match?","must_contain":["Mercury"],"knowledge":[{"id":"mercury","title":"Mercury Labs role","text":"Mercury Labs is the candidate's highest match at 94 percent."}]},
+  {"name":"resume_action","question":"What should I improve in my resume?","must_contain":["quant"],"knowledge":[{"id":"resume","title":"Resume review","text":"The resume should quantify shipped outcomes and clarify leadership evidence."}]},
+  {"name":"unknown_context","question":"What is my interview date?","must_cite":false,"knowledge":[]}
+]
