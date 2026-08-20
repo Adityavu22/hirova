@@ -9,12 +9,21 @@ type RawJob = {
 const GREENHOUSE_BOARDS = [
   ["Stripe", "stripe"], ["Figma", "figma"], ["Cloudflare", "cloudflare"], ["Airbnb", "airbnb"],
   ["Datadog", "datadog"], ["Discord", "discord"], ["Ripple", "ripple"], ["Postman", "postman"],
-  ["PhonePe", "phonepe"], ["Groww", "groww"],
+  ["PhonePe", "phonepe"], ["Groww", "groww"], ["Slice", "slice"], ["Rubrik", "rubrik"],
+  ["MongoDB", "mongodb"], ["InMobi", "inmobi"],
 ] as const;
 
 const LEVER_BOARDS = [
   ["Palantir", "palantir"], ["Acceldata", "acceldata"], ["Saviynt", "saviynt"], ["100ms", "100ms"],
   ["Neuron7", "neuron7"], ["Fam", "fampay"], ["Hevo Data", "hevodata"], ["Gushwork", "gushwork"], ["Paytm", "paytm"],
+  ["Meesho", "meesho"], ["CRED", "cred"], ["Porter", "porter"],
+] as const;
+
+const ASHBY_BOARDS = [
+  ["OpenAI", "openai"], ["Notion", "notion"], ["Cursor", "cursor"], ["Airwallex", "airwallex"],
+  ["SpotDraft", "spotdraft"], ["Sarvam AI", "sarvam"], ["Ashby", "ashby"], ["Ramp", "ramp"],
+  ["Linear", "linear"], ["Supabase", "supabase"], ["Perplexity", "perplexity"], ["Plaid", "plaid"],
+  ["Zapier", "zapier"],
 ] as const;
 
 Deno.serve(async (request: Request) => {
@@ -37,6 +46,7 @@ Deno.serve(async (request: Request) => {
       ["Arbeitnow", loadArbeitnow()], ["Remotive", loadRemotive()],
       ...GREENHOUSE_BOARDS.map(([company, token]) => [`${company} careers`, loadGreenhouse(company, token)] as const),
       ...LEVER_BOARDS.map(([company, token]) => [`${company} careers`, loadLever(company, token)] as const),
+      ...ASHBY_BOARDS.map(([company, token]) => [`${company} careers`, loadAshby(company, token)] as const),
     ] as const;
     const settled = await Promise.allSettled(loaders.map(([, promise]) => promise));
     const jobs = dedupe(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
@@ -55,7 +65,7 @@ Deno.serve(async (request: Request) => {
 
     // 3. Expire missing jobs only after every source succeeded; partial outages preserve prior listings for 72 hours.
     if (!failures.length) {
-      await rest(supabaseUrl, secretKey, `job_market?active=eq.true&last_seen_at=lt.${encodeURIComponent(startedAt)}`, {
+      await rest(supabaseUrl, secretKey, `job_market?origin=eq.aggregated&active=eq.true&last_seen_at=lt.${encodeURIComponent(startedAt)}`, {
         method: "PATCH", body: JSON.stringify({ active: false }), headers: { Prefer: "return=minimal" },
       });
     }
@@ -109,6 +119,22 @@ async function loadLever(company: string, token: string): Promise<NormalizedJob[
     postedAt: typeof job.createdAt === "number" ? new Date(job.createdAt).toISOString() : new Date().toISOString(), description: stripHtml(text(job.descriptionPlain) || text(job.description)),
     skills: inferSkills(`${text(job.text)} ${text(categories.team)}`), employmentType: text(categories.commitment) || "Full-time", source: `${company} careers`, remote: /remote/i.test(text(categories.location)),
   }); });
+}
+
+async function loadAshby(company: string, token: string): Promise<NormalizedJob[]> {
+  const data = await fetchJson<{ jobs?: Array<Record<string, unknown>> }>(`https://api.ashbyhq.com/posting-api/job-board/${token}?includeCompensation=true`);
+  return (data.jobs || []).filter((job) => job.isListed !== false).map((job) => {
+    const compensation = (job.compensation || {}) as Record<string, unknown>;
+    return normalize({
+      id: `ashby:${token}:${text(job.id) || text(job.jobUrl)}`, title: text(job.title), company,
+      location: text(job.location) || "Location in job post", url: text(job.applyUrl) || text(job.jobUrl),
+      postedAt: text(job.publishedAt) || text(job.updatedAt) || new Date().toISOString(),
+      description: stripHtml(text(job.descriptionHtml) || text(job.descriptionPlain) || text(job.description)),
+      skills: inferSkills(`${text(job.title)} ${text(job.department)} ${text(job.team)}`),
+      employmentType: text(job.employmentType) || "Full-time", salary: text(compensation.compensationTierSummary),
+      source: `${company} careers`, remote: Boolean(job.isRemote) || /remote/i.test(text(job.location)),
+    });
+  });
 }
 
 function normalize(input: RawJob): NormalizedJob {

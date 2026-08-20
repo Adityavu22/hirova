@@ -5,9 +5,9 @@
 [![CI](https://github.com/Adityavu22/hirova/actions/workflows/ci.yml/badge.svg)](https://github.com/Adityavu22/hirova/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Hirova is an AI-first job marketplace and career companion. It helps candidates discover source-linked job openings, build a professional profile, understand job matches, identify skill gaps, improve resumes, prepare for interviews, and manage applications from one workspace.
+Hirova is an AI-first job marketplace for candidates and employers. Job seekers can discover source-linked openings, build a professional profile, understand job matches, identify skill gaps, improve resumes, prepare for interviews, and manage applications. Recruiters can create a company workspace and publish, edit, pause, or close direct job listings.
 
-Jobs are collected from documented public feeds and employer career pages. Every listing retains its original source and application link; Hirova does not generate fictional vacancies.
+Jobs are collected daily from 41 documented public feeds and employer career pages, alongside listings posted directly by company recruiters. Every listing retains its source and application destination; Hirova does not generate fictional vacancies.
 
 ## Access Hirova
 
@@ -129,7 +129,7 @@ The complete request and response schemas are available through FastAPI at `/doc
 
 ## Job data and refresh schedule
 
-The job index uses documented public feeds and employer career APIs. Records are normalized, deduplicated, and stored with their original application URLs. A scheduled Supabase Edge Function refreshes the index daily at 06:45 IST.
+The job index uses 41 documented endpoints across Greenhouse, Lever, Ashby, Arbeitnow, and Remotive. Records are normalized, deduplicated, and stored with their original application URLs. A scheduled Supabase Edge Function refreshes imported listings daily at 06:45 IST. Published recruiter listings enter the same search index immediately and disappear when closed or expired.
 
 If a source temporarily fails, Hirova retains the last healthy records and reports the failed source instead of replacing the marketplace with incomplete data.
 

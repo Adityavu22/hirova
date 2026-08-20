@@ -1,7 +1,6 @@
-import CareerDashboard from "./career-dashboard";
 import { AuthGate } from "./auth";
-import { ProductStore } from "./product-store";
+import WorkspaceRouter from "./workspace-router";
 
 export default function Home() {
-  return <AuthGate><ProductStore><CareerDashboard /></ProductStore></AuthGate>;
+  return <AuthGate><WorkspaceRouter /></AuthGate>;
 }

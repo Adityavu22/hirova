@@ -16,14 +16,14 @@ This is the honest production map against the supplied 52-area Naukri/Indeed fun
 | 10 | Job alerts | Not yet | Needs saved-search rules, delivery scheduler, unsubscribe and email/push provider. |
 | 11 | Recruiter discovery | Not yet | Requires recruiter product and candidate visibility controls. |
 | 12 | Messaging | Not yet | Requires verified employer identities, threads, spam protection and notifications. |
-| 13 | Company pages | Partial | Employer/source identity is shown; dedicated profiles, follows and media remain. |
+| 13 | Company pages | Partial | Recruiters maintain company identity, website, industry, location and description; public dedicated pages, follows and media remain. |
 | 14 | Company reviews | Not yet | Requires moderation, anonymity, dispute and abuse workflows. |
 | 15 | Salary tools | Partial | Publisher salary is displayed when supplied; estimates and benchmarking remain. |
 | 16 | Career content | Not yet | Needs editorial CMS, taxonomy and moderation. |
 | 17 | AI career assistant | Partial | Grounded profile/job Q&A exists; conversation history and citations need expansion. |
 | 18 | AI matching | Partial | Explainable profile matching works; embeddings, feedback calibration and eval gates remain. |
-| 19 | Recruiter dashboard | Not yet | Separate employer workspace required. |
-| 20 | Job posting | Not yet | Separate verified-employer authoring, preview and lifecycle required. |
+| 19 | Recruiter dashboard | Operational | Separate role-based employer workspace with company setup, listing counts and job management. |
+| 20 | Job posting | Operational | Recruiters can create, edit, draft, publish and close company-owned listings; published jobs enter public search immediately. |
 | 21 | AI-assisted posting | Not yet | Must follow real employer posting and approval workflow. |
 | 22 | Applicant dashboard | Not yet | Requires native job applications and employer ownership. |
 | 23 | Screening | Not yet | Requires consent, configurable questions and auditable decision support. |
@@ -41,7 +41,7 @@ This is the honest production map against the supplied 52-area Naukri/Indeed fun
 | 35 | Candidate analytics | Partial | Saved/applied/profile-strength summaries exist; search and funnel analytics remain. |
 | 36 | Notifications | Partial | In-app surface exists; event-driven inbox, preferences, email and push remain. |
 | 37 | Search/recommendation infrastructure | Partial | Durable Supabase/Postgres full-text index, filters, cache and explainable ranking; vector reranking and feedback calibration remain. |
-| 38 | Aggregation/feed management | Operational | Twenty-one documented feeds/employer boards, including India-focused employers, with dedupe, authenticated source links, daily refresh, failure telemetry and safe stale-record handling. |
+| 38 | Aggregation/feed management | Operational | Forty-one documented Greenhouse, Lever, Ashby and public feed endpoints, including India-focused employers, with dedupe, authenticated source links, daily refresh, failure telemetry and safe stale-record handling. |
 | 39 | Moderation | Not yet | Requires queues, policy enforcement, appeals and auditability. |
 | 40 | Trust/fraud | Partial | Only documented sources are accepted; reporting, employer verification and fraud scoring remain. |
 | 41 | Admin | Not yet | Requires role-based operational console. |
@@ -55,11 +55,11 @@ This is the honest production map against the supplied 52-area Naukri/Indeed fun
 | 49 | Security | Partial | Supabase sessions, token verification, validation and secret separation; formal threat model/audit remain. |
 | 50 | Support | Not yet | Requires help centre, ticketing, case status and escalation policy. |
 | 51 | Analytics/operations | Partial | Tests, CI and deployment structure exist; product analytics, SLOs, alerting and incident runbooks remain. |
-| 52 | Journeys and NFRs | Partial | Core candidate discover→profile→match→apply→track→prepare journey works; full recruiter/admin journeys and scale validation remain. |
+| 52 | Journeys and NFRs | Partial | Candidate discover→profile→match→apply→track→prepare and recruiter company→draft→publish→close journeys work; applicant management, admin operations and scale validation remain. |
 
 ## Release priorities
 
 1. P0 candidate marketplace: continue adding compliant feeds, alerts, privacy/export/delete, and operational monitoring.
-2. P0 employer marketplace: verified employer onboarding, posting, native apply, applicant pipeline, messaging and audit logs.
+2. P0 employer marketplace: employer verification, native applications, applicant pipeline, messaging, organisation teams and audit logs.
 3. P1 trust and monetisation: moderation, fraud operations, billing/sponsored disclosure, reviews and salary quality.
 4. P1 scale: dedicated search index, event system, analytics, SLOs, localization and accessibility audit.

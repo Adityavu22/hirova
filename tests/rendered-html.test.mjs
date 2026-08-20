@@ -59,5 +59,20 @@ test("loads India-first jobs from local employer boards", async () => {
   const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
   const sync = await readFile(new URL("../supabase/functions/sync-jobs/index.ts", import.meta.url), "utf8");
   assert.match(portal, /useState\("India"\)/);
-  for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm"]) assert.match(sync, new RegExp(`"${token}"`));
+  for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm", "meesho", "cred", "porter", "slice", "inmobi", "spotdraft", "sarvam"]) assert.match(sync, new RegExp(`"${token}"`));
+  assert.match(sync, /const ASHBY_BOARDS/);
+  assert.equal((sync.match(/\["[^"]+",\s*"[^"]+"\]/g) || []).length, 39);
+});
+
+test("protects recruiter-owned company listings", async () => {
+  // 7. Account roles are persisted, recruiter writes are owner-scoped, and guest search never receives apply_url.
+  const auth = await readFile(new URL("../app/auth.tsx", import.meta.url), "utf8");
+  const dashboard = await readFile(new URL("../app/recruiter-dashboard.tsx", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/20260820143000_recruiter_marketplace.sql", import.meta.url), "utf8");
+  assert.match(auth, /job_seeker.*recruiter|recruiter.*job_seeker/s);
+  assert.match(dashboard, /Post a job/);
+  assert.match(migration, /account_profiles/);
+  assert.match(migration, /recruiter_id = \(select auth\.uid\(\)\)/);
+  assert.match(migration, /sync_recruiter_job_to_market/);
+  assert.doesNotMatch(migration.match(/grant select \([\s\S]*?\) on public\.job_market to anon/i)?.[0] || "", /source_url|apply_url/i);
 });

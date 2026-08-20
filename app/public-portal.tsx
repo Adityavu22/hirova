@@ -3,17 +3,18 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { Job } from "./product-data";
 import { fetchMarketJobs } from "./job-service";
+import type { AccountType } from "./auth";
 
 type JobsResponse = {
   jobs: Job[];
   total: number;
   marketTotal: number;
-  hasMore: boolean;
+  hasMore?: boolean;
   updatedAt: string;
   sourceNotice: string;
 };
 
-export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
+export default function PublicPortal({ onSignIn }: { onSignIn: (accountType?: AccountType) => void }) {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("India");
   const [mode, setMode] = useState("All");
@@ -52,11 +53,11 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
   return <main className="public-shell">
     <header className="public-header">
       <button className="public-brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>H</span> Hirova</button>
-      <nav aria-label="Public navigation"><a href="#jobs">Jobs</a><a href="#how-it-works">How it works</a><button onClick={onSignIn}>Sign in</button><button className="public-join" onClick={onSignIn}>Create profile</button></nav>
+      <nav aria-label="Public navigation"><a href="#jobs">Jobs</a><a href="#how-it-works">How it works</a><button onClick={() => onSignIn("recruiter")}>For employers</button><button onClick={() => onSignIn("job_seeker")}>Sign in</button><button className="public-join" onClick={() => onSignIn("job_seeker")}>Create profile</button></nav>
     </header>
 
     <section className="public-hero">
-      <div><span className="public-kicker"><i /> LIVE, SOURCE-VERIFIED OPENINGS</span><h1>Get hired<br/><em>smarter.</em></h1></div>
+      <div><span className="public-kicker"><i /> LIVE, SOURCE-LINKED OPENINGS</span><h1>Get hired<br/><em>smarter.</em></h1></div>
       <aside><b>{meta?.marketTotal ? meta.marketTotal.toLocaleString("en-IN") : "2,000+"}</b><span>live openings indexed</span><small>Updated from original sources—not generated listings</small></aside>
     </section>
 
@@ -71,7 +72,7 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
       <div className="public-result-head"><div><span className="public-kicker"><i /> LIVE MARKET</span><h2>{busy ? "Refreshing current openings…" : `${meta?.total?.toLocaleString("en-IN") || jobs.length} roles found`}</h2></div><p>{meta?.updatedAt ? `Last refreshed ${new Date(meta.updatedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : "Direct employer and public job feeds"}</p></div>
       {error ? <div className="public-error"><b>We couldn’t refresh the market.</b><p>{error}</p><button onClick={() => search()}>Try again</button></div> : <div className="public-grid">
         <div className="public-list" aria-label="Job results">{jobs.map((job) => <button key={job.id} className={selected?.id === job.id ? "selected" : ""} onClick={() => setSelected(job)}><span className={`company-logo ${job.color}`}>{job.logo}</span><div><b>{job.title}</b><p>{job.company} · {job.location}</p><small>{job.mode} · {job.posted} · {job.source}</small></div><em>{job.match}%</em></button>)}</div>
-        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">Verified source · {selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>TYPE</small>{selected.employmentType || "See listing"}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><button className="public-apply" onClick={onSignIn}>Sign in to apply <span>→</span></button><small className="source-note">You can search every public listing here. Sign in to view the verified application link, save jobs and track applications.</small></article>}
+        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">{selected.source?.includes("· Hirova") ? "Posted directly" : "Employer source"} · {selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>TYPE</small>{selected.employmentType || "See listing"}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><button className="public-apply" onClick={() => onSignIn("job_seeker")}>Sign in to apply <span>→</span></button><small className="source-note">You can search every public listing here. Sign in to view the application link, save jobs and track applications.</small></article>}
       </div>}
     </section>
 
