@@ -24,7 +24,7 @@ test("server-renders the Hirova public marketplace", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Hirova — Real jobs, matched intelligently<\/title>/i);
+  assert.match(html, /<title>Hirova — Get hired smarter\.<\/title>/i);
   assert.match(html, /Preparing your workspace|Hirova/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });

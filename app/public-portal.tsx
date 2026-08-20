@@ -56,7 +56,7 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
     </header>
 
     <section className="public-hero">
-      <div><span className="public-kicker"><i /> LIVE, SOURCE-VERIFIED OPENINGS</span><h1>Find work that fits.<br/><em>Know why it fits.</em></h1><p>Search current roles from public job feeds and employer career pages. Hirova ranks them around your profile after you sign in.</p></div>
+      <div><span className="public-kicker"><i /> LIVE, SOURCE-VERIFIED OPENINGS</span><h1>Get hired<br/><em>smarter.</em></h1></div>
       <aside><b>{meta?.marketTotal ? meta.marketTotal.toLocaleString("en-IN") : "2,000+"}</b><span>live openings indexed</span><small>Updated from original sources—not generated listings</small></aside>
     </section>
 
@@ -76,6 +76,6 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
     </section>
 
     <section className="public-how" id="how-it-works"><span className="public-kicker">HOW HIROVA WORKS</span><h2>A serious job search, with useful AI in the background.</h2><div><article><b>01</b><h3>Build your profile</h3><p>Add your resume, skills, preferences, experience and target roles.</p></article><article><b>02</b><h3>Rank real openings</h3><p>Hirova compares your evidence with current, source-linked job listings.</p></article><article><b>03</b><h3>Apply and stay organised</h3><p>Apply at the original source, then track progress, notes and preparation here.</p></article></div></section>
-    <footer className="public-footer"><b><span>H</span> Hirova</b><p>Real opportunities. Clear decisions.</p><small>{meta?.sourceNotice || "Job availability is controlled by original publishers."}</small></footer>
+    <footer className="public-footer"><b><span>H</span> Hirova</b><p>Get hired smarter.</p><small>{meta?.sourceNotice || "Job availability is controlled by original publishers."}</small></footer>
   </main>;
 }

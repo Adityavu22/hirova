@@ -9,14 +9,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
   const image = new URL("/hirova-social.png", base).toString();
-  const description = "Discover current, source-verified jobs and use practical AI to match, apply, prepare, and stay organised.";
+  const description = "Get hired smarter with source-verified jobs, personalised matching, resume intelligence, and practical interview preparation.";
   return {
     metadataBase: base,
-    title: "Hirova — Real jobs, matched intelligently",
+    title: "Hirova — Get hired smarter.",
     description,
     icons: { icon: "/favicon.svg" },
-    openGraph: { title: "Hirova — Real jobs, matched intelligently", description, images: [{ url: image, width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title: "Hirova — Real jobs, matched intelligently", description, images: [image] },
+    openGraph: { title: "Hirova — Get hired smarter.", description, images: [{ url: image, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title: "Hirova — Get hired smarter.", description, images: [image] },
   };
 }
 
