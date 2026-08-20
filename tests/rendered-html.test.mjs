@@ -13,9 +13,9 @@ async function productionWorker() {
   return worker;
 }
 
-async function render() {
+async function render(url = "http://localhost/") {
   const worker = await productionWorker();
-  return worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
+  return worker.fetch(new Request(url, { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
 
 test("server-renders the Hirova public marketplace", async () => {
@@ -27,4 +27,11 @@ test("server-renders the Hirova public marketplace", async () => {
   assert.match(html, /<title>Hirova — Get hired smarter\.<\/title>/i);
   assert.match(html, /Preparing your workspace|Hirova/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+});
+
+test("redirects www traffic to the canonical Hirova domain", async () => {
+  // 3. Preserve the complete path and query while consolidating SEO signals.
+  const response = await render("https://www.hirova.in/jobs?role=designer");
+  assert.equal(response.status, 308);
+  assert.equal(response.headers.get("location"), "https://hirova.in/jobs?role=designer");
 });
