@@ -11,16 +11,30 @@ Jobs are collected from documented public feeds and employer career pages. Every
 
 ## Access Hirova
 
-- Web application: [https://hirova.in](https://hirova.in)
-- GitHub repository: [github.com/Adityavu22/hirova](https://github.com/Adityavu22/hirova)
-- Local frontend: `http://localhost:3000`
-- Local API documentation: `http://localhost:8000/docs`
+- [Launch Hirova](https://hirova.in)
+- [View the source on GitHub](https://github.com/Adityavu22/hirova)
 
 ## Technology
 
 Hirova uses React, TypeScript, vinext, FastAPI, PostgreSQL, Supabase Auth, LangGraph, Qdrant, Docker, and GitHub Actions. Groq is the default optional AI provider, with Gemini supported through configuration. A no-cost deterministic mode is available for local development.
 
-## Run from the terminal
+## Access the source from the terminal
+
+Using GitHub CLI:
+
+```bash
+gh repo clone Adityavu22/hirova
+cd hirova
+```
+
+Using Git:
+
+```bash
+git clone https://github.com/Adityavu22/hirova.git
+cd hirova
+```
+
+## Build from source
 
 ### Prerequisites
 
@@ -30,14 +44,7 @@ Hirova uses React, TypeScript, vinext, FastAPI, PostgreSQL, Supabase Auth, LangG
 - Git
 - Docker Desktop, only for the containerised setup
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Adityavu22/hirova.git
-cd hirova
-```
-
-### 2. Start the frontend
+### Frontend
 
 ```bash
 npm install
@@ -45,21 +52,19 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+### FastAPI backend
 
-### 3. Start the FastAPI backend
-
-Open a second terminal:
+From the repository root, open a second terminal:
 
 ```bash
-cd hirova/backend
+cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open `http://localhost:8000/docs` for the interactive API reference.
+FastAPI exposes its interactive request and response reference at `/docs`.
 
 On Windows PowerShell, activate the virtual environment with:
 
@@ -67,11 +72,9 @@ On Windows PowerShell, activate the virtual environment with:
 .venv\Scripts\Activate.ps1
 ```
 
-### Run the complete stack with Docker
+### Complete stack with Docker
 
 ```bash
-git clone https://github.com/Adityavu22/hirova.git
-cd hirova
 cp .env.example .env
 docker compose up --build
 ```
