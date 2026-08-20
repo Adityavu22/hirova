@@ -45,7 +45,7 @@ async def get_current_user(
         metadata = payload.get("user_metadata") or {}
         return CurrentUser(
             id=str(payload["id"]),
-            email=str(payload.get("email") or f"{payload['id']}@phone.hirova.local"),
+            email=str(payload.get("email") or f"{payload['id']}@account.hirova.local"),
             name=str(metadata.get("full_name") or metadata.get("name") or "Hirova member"),
         )
 

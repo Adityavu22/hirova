@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const image = new URL("/hirova-social.png", base).toString();
+  const image = new URL("/hirova-social-v2.png", base).toString();
   const description = "Get hired smarter with source-verified jobs, personalised matching, resume intelligence, and practical interview preparation.";
   return {
     metadataBase: base,

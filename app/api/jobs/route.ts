@@ -24,6 +24,14 @@ type PublicJob = {
   source: string;
   sourceUrl: string;
   employmentType: string;
+  category?: string;
+  careerLevel?: "intern" | "early" | "mid" | "senior";
+  minExperienceYears?: number | null;
+  maxExperienceYears?: number | null;
+  experienceConfidence?: "low" | "medium" | "high";
+  applicationMethod?: "native" | "external" | "both";
+  origin?: "aggregated" | "recruiter";
+  recruiterJobId?: string | null;
 };
 
 const GREENHOUSE_BOARDS = [
@@ -57,6 +65,12 @@ export async function GET(request: Request) {
   const query = clean(url.searchParams.get("query") || "").toLowerCase();
   const location = clean(url.searchParams.get("location") || "").toLowerCase();
   const mode = clean(url.searchParams.get("mode") || "All");
+  const company = clean(url.searchParams.get("company") || "").toLowerCase();
+  const category = clean(url.searchParams.get("category") || "All");
+  const careerLevel = clean(url.searchParams.get("careerLevel") || "All");
+  const employmentType = clean(url.searchParams.get("employmentType") || "All");
+  const postedWithinDays = Math.min(30, Math.max(1, Number(url.searchParams.get("postedWithinDays")) || 30));
+  const sort = clean(url.searchParams.get("sort") || "relevance");
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const pageSize = Math.min(2500, Math.max(12, Number(url.searchParams.get("limit")) || 30));
 
@@ -74,19 +88,27 @@ export async function GET(request: Request) {
   const usingSnapshot = forceSnapshot || liveJobs.length === 0;
   const jobs = usingSnapshot ? snapshot.jobs as PublicJob[] : liveJobs;
   const unavailable = settled.flatMap((result, index) => result.status === "rejected" ? [sourceLabels[index]] : []);
-  const filtered = jobs.filter((job) => {
+  const currentJobs = jobs.filter((job) => Date.parse(job.postedAt) >= Date.now() - 30 * 86400000);
+  const filtered = currentJobs.filter((job) => {
     const text = `${job.title} ${job.company} ${job.skills.join(" ")} ${job.description}`.toLowerCase();
     const matchesQuery = !query || text.includes(query) || query.split(/\s+/).every((term) => text.includes(term));
     const matchesLocation = !location || job.location.toLowerCase().includes(location) || (isIndiaQuery(location) && isIndiaLocation(job.location)) || (location.includes("remote") && job.mode === "Remote");
     const matchesMode = mode === "All" || job.mode === mode;
-    return matchesQuery && matchesLocation && matchesMode;
-  }).sort((a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt));
+    const matchesCompany = !company || job.company.toLowerCase() === company;
+    const matchesCategory = category === "All" || (job.category || inferCategory(job.title)) === category;
+    const matchesCareer = careerLevel === "All" || (job.careerLevel || inferExperienceMeta(`${job.title} ${job.experience}`).careerLevel) === careerLevel;
+    const matchesType = employmentType === "All" || job.employmentType === employmentType;
+    const matchesDate = Date.parse(job.postedAt) >= Date.now() - postedWithinDays * 86400000;
+    return matchesQuery && matchesLocation && matchesMode && matchesCompany && matchesCategory && matchesCareer && matchesType && matchesDate;
+  }).sort((a, b) => sort === "newest" ? Date.parse(b.postedAt) - Date.parse(a.postedAt) : Date.parse(b.postedAt) - Date.parse(a.postedAt));
   const start = (page - 1) * pageSize;
 
   return Response.json({
     jobs: filtered.slice(start, start + pageSize).map((job) => hasSession ? job : withoutApplicationUrl(job)),
     total: filtered.length,
-    marketTotal: jobs.length,
+    marketTotal: currentJobs.length,
+    companies: [...new Set(currentJobs.map((job) => job.company))].sort(),
+    categories: [...new Set(currentJobs.map((job) => job.category || inferCategory(job.title)))].sort(),
     page,
     pageSize,
     hasMore: start + pageSize < filtered.length,
@@ -165,13 +187,17 @@ function normalize(input: { id: string; title: string; company: string; location
   const mode = input.remote || /remote|anywhere|distributed/i.test(input.location) ? "Remote" : /hybrid/i.test(input.location) ? "Hybrid" : "On-site";
   const postedAt = validDate(input.postedAt);
   const skills = [...new Set([...input.skills, ...inferSkills(`${input.title} ${input.description}`)])].slice(0, 7);
+  const experienceMeta = inferExperienceMeta(`${input.title} ${input.description}`);
   return {
     id: input.id, title: input.title || "Open role", company: input.company || "Employer", location: input.location || "See listing", salary: input.salary || "Salary not disclosed",
-    mode, experience: inferExperience(`${input.title} ${input.description}`), match: 70, logo: (input.company || "H").slice(0, 1).toUpperCase(), color: colorFor(input.company),
+    mode, experience: experienceMeta.label, match: 70, logo: (input.company || "H").slice(0, 1).toUpperCase(), color: colorFor(input.company),
     posted: relativeDate(postedAt), postedAt, skills: skills.length ? skills : ["Role-specific skills"], missing: ["Review full requirements"],
     why: "Match score is calculated from your profile, skills, preferences, and the available listing details.", description: compact(input.description) || "Open the employer listing for complete details.",
     responsibilities: ["Review the complete responsibilities on the employer's original posting"], benefits: [], applicants: 0, source: input.source, sourceUrl: input.url,
-    employmentType: input.employmentType || "Full-time",
+    employmentType: input.employmentType || "Full-time", category: inferCategory(input.title),
+    careerLevel: experienceMeta.careerLevel, minExperienceYears: experienceMeta.min,
+    maxExperienceYears: experienceMeta.max, experienceConfidence: experienceMeta.confidence,
+    applicationMethod: "external", origin: "aggregated", recruiterJobId: null,
   };
 }
 
@@ -191,8 +217,16 @@ function dedupe(jobs: PublicJob[]) {
   const seen = new Set<string>();
   return jobs.filter((job) => { const key = `${job.company}|${job.title}|${job.location}`.toLowerCase().replace(/\s+/g, " "); if (seen.has(key)) return false; seen.add(key); return true; });
 }
-function inferSkills(value: string) { const bank = ["Python","JavaScript","TypeScript","React","Node.js","Java","Go","SQL","AWS","Azure","GCP","Kubernetes","Machine learning","Product management","Product design","Figma","Data analysis","Sales","Marketing","Finance","Operations","Security"]; const lower = value.toLowerCase(); return bank.filter((skill) => lower.includes(skill.toLowerCase())); }
-function inferExperience(value: string) { const match = value.match(/(\d+)\+?\s*(?:-|to)?\s*(\d+)?\s*years?/i); return match ? `${match[1]}${match[2] ? `-${match[2]}` : "+"} yrs` : "See listing"; }
+function inferSkills(value: string) { const bank = ["Python","JavaScript","TypeScript","React","Node.js","Java","Go","SQL","AWS","Azure","GCP","Kubernetes","Machine learning","Product management","Product design","Figma","Data analysis","Sales","Marketing","Finance","Operations","Security"]; return bank.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i").test(value)); }
+function inferExperienceMeta(value: string) {
+  const match = value.match(/(\d+)\+?\s*(?:-|–|to)?\s*(\d+)?\s*years?/i);
+  const min = match ? Number(match[1]) : null;
+  const max = match?.[2] ? Number(match[2]) : null;
+  const title = value.toLowerCase();
+  const careerLevel = /\b(intern|internship|trainee)\b/.test(title) ? "intern" : /\b(principal|director|head|staff|lead|vp|vice president)\b/.test(title) || (min !== null && min > 10) ? "senior" : /\b(senior|manager)\b/.test(title) || (min !== null && min >= 5) ? "mid" : "early";
+  return { label: match ? `${match[1]}${match[2] ? `-${match[2]}` : "+"} yrs` : "Experience not specified", min, max, careerLevel: careerLevel as "intern" | "early" | "mid" | "senior", confidence: match ? "high" as const : /\b(intern|junior|associate|senior|manager|lead|staff|principal|director|head)\b/.test(title) ? "medium" as const : "low" as const };
+}
+function inferCategory(value: string) { const title = value.toLowerCase(); if (/\b(product manager|product owner)\b/.test(title)) return "Product"; if (/\b(designer|design|ux|ui)\b/.test(title)) return "Design"; if (/\b(sales|business development|account executive)\b/.test(title)) return "Sales"; if (/\b(marketing|growth|content|brand)\b/.test(title)) return "Marketing"; if (/\b(finance|accountant|audit|tax)\b/.test(title)) return "Finance"; if (/\b(human resources|recruiter|talent|people)\b/.test(title)) return "Human Resources"; if (/\b(operations|supply chain|customer support|customer success)\b/.test(title)) return "Operations"; if (/\b(software|developer|engineer|devops|cloud|security|data|machine learning|ai)\b/.test(title)) return "Technology"; return "Other"; }
 function colorFor(value: string) { const colors = ["blue","plum","orange","green-logo","teal-logo","black-logo"]; return colors[Math.abs([...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % colors.length]; }
 function validDate(value: string) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? new Date().toISOString() : date.toISOString(); }
 function relativeDate(value: string) { const days = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 86400000)); return days === 0 ? "Today" : days === 1 ? "Yesterday" : `${days} days ago`; }

@@ -7,13 +7,10 @@ import PublicPortal from "./public-portal";
 export type AccountType = "job_seeker" | "recruiter";
 type AuthIdentity = { userId: string; name: string; email: string; mode: "supabase" | "demo"; accountType: AccountType; accessToken?: string };
 type AuthContextValue = AuthIdentity & { signOut: () => Promise<void>; switchWorkspace: (accountType: AccountType) => Promise<void> };
-type AuthMethod = "phone" | "email";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
-const phoneEnabled = process.env.NEXT_PUBLIC_PHONE_AUTH_ENABLED === "true";
 const pendingRoleKey = "hirova:pending-account-type";
 let browserClient: SupabaseClient | null | undefined;
 
@@ -97,10 +94,6 @@ export function useHirovaAuth(): AuthContextValue {
 
 function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: SupabaseClient | null; initialRole: AccountType; onSignedIn: (identity: AuthIdentity, accountType: AccountType) => Promise<void>; onBack: () => void }) {
   const [role, setRole] = useState<AccountType>(initialRole);
-  const [method, setMethod] = useState<AuthMethod>("email");
-  const [phone, setPhone] = useState("+91 ");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
@@ -113,36 +106,7 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
     if (typeof window !== "undefined") window.localStorage.setItem(pendingRoleKey, accountType);
   }
 
-  // 2. Phone authentication uses the provider's SMS OTP flow; demo code is intentionally explicit.
-  async function handlePhone(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setMessage("");
-    try {
-      chooseRole(role);
-      if (!phoneEnabled && supabase) throw new Error("Phone login will be available after SMS delivery is connected.");
-      const normalized = phone.replace(/\s/g, "");
-      if (!otpSent) {
-        if (!/^\+[1-9]\d{7,14}$/.test(normalized)) throw new Error("Enter a valid phone number with country code.");
-        if (supabase) {
-          const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
-          if (error) throw error;
-        } else await pause(450);
-        setOtpSent(true);
-        setMessage(isDemo ? "Preview OTP sent. Use 123456." : "OTP sent. Check your phone.");
-      } else {
-        if (isDemo) {
-          if (otp !== "123456") throw new Error("For the private preview, enter 123456.");
-          await onSignedIn(identityFromUser(undefined, "Hirova member", undefined, "demo-phone", role), role);
-        } else {
-          const { data, error } = await supabase.auth.verifyOtp({ phone: normalized, token: otp, type: "sms" });
-          if (error) throw error;
-          if (data.user) await onSignedIn(identityFromUser(data.user.email, data.user.user_metadata?.full_name, data.session?.access_token, data.user.id, role), role);
-        }
-      }
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to continue."); }
-    finally { setBusy(false); }
-  }
-
-  // 3. Email supports both existing-user login and intentional account creation.
+  // 2. Email supports both existing-user login and intentional account creation.
   async function handleEmail(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage("");
     try {
@@ -166,12 +130,11 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
     finally { setBusy(false); }
   }
 
-  // 4. Google uses OAuth redirect in production and a reversible in-memory identity in preview mode.
+  // 3. Google uses Supabase OAuth in production and a reversible preview identity locally.
   async function handleGoogle() {
     setBusy(true); setMessage("");
     try {
       chooseRole(role);
-      if (!googleEnabled && supabase) throw new Error("Google login is not enabled yet. Use email for now.");
       if (!supabase) {
         await pause(450);
         await onSignedIn(identityFromUser("preview@hirova.local", "Preview member", undefined, "demo-google", role), role);
@@ -204,20 +167,14 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
         <button className="auth-back" onClick={onBack}>← Back to jobs</button>
         <div className="auth-heading"><span className="mini-mark">H</span><p className="auth-status"><i /> {isDemo ? "LOCAL PREVIEW" : "SECURE SIGN IN"}</p><h2>Choose your Hirova workspace</h2><p>Use one secure account and continue in the workspace you need.</p></div>
         <div className="account-type-picker" aria-label="Account type"><button type="button" className={role === "job_seeker" ? "active" : ""} onClick={() => chooseRole("job_seeker")}><span>◎</span><b>Job seeker</b><small>Find jobs and manage your career</small></button><button type="button" className={role === "recruiter" ? "active" : ""} onClick={() => chooseRole("recruiter")}><span>▣</span><b>Recruiter</b><small>Post jobs for your company</small></button></div>
-        <button className="google-button" type="button" onClick={handleGoogle} disabled={busy || (!googleEnabled && !isDemo)}><span className="google-g">G</span> {googleEnabled || isDemo ? "Continue with Google" : "Google sign-in · setup pending"}</button>
+        <button className="google-button" type="button" onClick={handleGoogle} disabled={busy}><span className="google-g">G</span> Continue with Google</button>
         <div className="auth-divider"><span>or continue with</span></div>
-        <div className="auth-tabs" role="tablist"><button className={method === "email" ? "active" : ""} onClick={() => { setMethod("email"); setMessage(""); }} role="tab">Email</button><button className={method === "phone" ? "active" : ""} onClick={() => { if (phoneEnabled || isDemo) setMethod("phone"); setMessage(phoneEnabled || isDemo ? "" : "Phone login needs an SMS provider. Email sign-in is available now."); }} role="tab">Phone <small>{phoneEnabled || isDemo ? "" : "Soon"}</small></button></div>
-
-        {method === "phone" ? <form className="auth-form" onSubmit={handlePhone}>
-          <label htmlFor="phone">MOBILE NUMBER</label><div className="auth-input"><span>◉</span><input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={otpSent} placeholder="+91 98765 43210" /></div>
-          {otpSent && <><label htmlFor="otp">6-DIGIT OTP</label><div className="auth-input otp-input"><span>⌁</span><input id="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} placeholder="••••••"/><button type="button" onClick={() => { setOtpSent(false); setOtp(""); setMessage(""); }}>Change</button></div></>}
-          <button className="auth-primary" disabled={busy}>{busy ? "Please wait…" : otpSent ? "Verify & continue" : "Send OTP"}<span>→</span></button>
-        </form> : <form className="auth-form" onSubmit={handleEmail}>
+        <form className="auth-form" onSubmit={handleEmail}>
           <label htmlFor="email">EMAIL ADDRESS</label><div className="auth-input"><span>@</span><input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></div>
           <div className="password-label"><label htmlFor="password">PASSWORD</label>{!createAccount && <button type="button" onClick={handlePasswordReset}>Forgot password?</button>}</div><div className="auth-input"><span>⌾</span><input id="password" type="password" autoComplete={createAccount ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
           <button className="auth-primary" disabled={busy}>{busy ? "Please wait…" : createAccount ? "Create account" : "Sign in"}<span>→</span></button>
           <p className="switch-auth">{createAccount ? "Already have an account?" : "New to Hirova?"} <button type="button" onClick={() => { setCreateAccount(!createAccount); setMessage(""); }}>{createAccount ? "Sign in" : "Create an account"}</button></p>
-        </form>}
+        </form>
         {message && <p className={`auth-message ${message.toLowerCase().includes("sent") || message.toLowerCase().includes("created") ? "success" : ""}`}>{message}</p>}
         <p className="auth-terms">By continuing, you agree to Hirova&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
       </div>
@@ -227,7 +184,7 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
 }
 
 function identityFromUser(email?: string, fullName?: string, accessToken?: string, userId = "member", accountType: AccountType = "job_seeker"): AuthIdentity {
-  const safeEmail = email || `${userId || "member"}@phone.hirova`;
+  const safeEmail = email || `${userId || "member"}@hirova.in`;
   return { userId, name: fullName || safeEmail.split("@")[0].replace(/[._-]/g, " "), email: safeEmail, mode: userId.startsWith("demo-") ? "demo" : "supabase", accountType, accessToken };
 }
 

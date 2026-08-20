@@ -5,7 +5,7 @@
 [![CI](https://github.com/Adityavu22/hirova/actions/workflows/ci.yml/badge.svg)](https://github.com/Adityavu22/hirova/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Hirova is an AI-first job marketplace for candidates and employers. Job seekers can discover source-linked openings, build a professional profile, understand job matches, identify skill gaps, improve resumes, prepare for interviews, and manage applications. Recruiters can create a company workspace and publish, edit, pause, or close direct job listings.
+Hirova is an AI-first job marketplace for candidates and employers. Job seekers can discover source-linked openings, build a professional profile, understand job matches, identify skill gaps, improve resumes, prepare for interviews, and manage applications. Recruiters can create a company workspace, publish listings, receive native applications, filter candidates, and manage their hiring pipeline.
 
 Jobs are collected daily from 41 documented public feeds and employer career pages, alongside listings posted directly by company recruiters. Every listing retains its source and application destination; Hirova does not generate fictional vacancies.
 
@@ -99,7 +99,7 @@ LLM_PROVIDER=gemini
 GEMINI_API_KEY=your_key_here
 ```
 
-For production authentication and user data, configure Supabase:
+For production authentication and user data, configure Supabase. Google sign-in is supported through Supabase OAuth; phone login is intentionally not included.
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co

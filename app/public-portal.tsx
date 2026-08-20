@@ -1,82 +1,108 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Job } from "./product-data";
-import { fetchMarketJobs } from "./job-service";
+import { fetchMarketJobs, type JobFeed } from "./job-service";
 import type { AccountType } from "./auth";
 
-type JobsResponse = {
-  jobs: Job[];
-  total: number;
-  marketTotal: number;
-  hasMore?: boolean;
-  updatedAt: string;
-  sourceNotice: string;
-};
+const CAREER_LEVELS = [
+  ["intern", "Internship / Student"], ["early", "Early career · under 5 years"],
+  ["mid", "Mid career · 5–10 years"], ["senior", "Senior level · over 10 years"],
+] as const;
+const FALLBACK_CATEGORIES = ["Technology", "Product", "Design", "Sales", "Marketing", "Finance", "Human Resources", "Operations"];
 
 export default function PublicPortal({ onSignIn }: { onSignIn: (accountType?: AccountType) => void }) {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("India");
   const [mode, setMode] = useState("All");
+  const [company, setCompany] = useState("");
+  const [category, setCategory] = useState("All");
+  const [careerLevel, setCareerLevel] = useState("All");
+  const [employmentType, setEmploymentType] = useState("All");
+  const [postedWithinDays, setPostedWithinDays] = useState(30);
+  const [sort, setSort] = useState<"relevance" | "newest">("relevance");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<Job | null>(null);
-  const [meta, setMeta] = useState<JobsResponse | null>(null);
+  const [meta, setMeta] = useState<JobFeed | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // 1. Load the daily market once without coupling the initial request to editable form state.
     let active = true;
-    void fetchMarketJobs({ location: "India", limit: 60 })
-      .then((data) => {
-        if (!active) return;
-        setJobs(data.jobs); setMeta(data as JobsResponse); setSelected(data.jobs[0] || null);
-      })
-      .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : "Unable to load live jobs.");
-      })
+    void fetchMarketJobs({ location: "India", postedWithinDays: 30, limit: 80 })
+      .then((data) => { if (active) { setJobs(data.jobs); setMeta(data); setSelected(data.jobs[0] || null); } })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load jobs."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, []);
 
   async function search(event?: FormEvent) {
     event?.preventDefault();
+    await runSearch();
+    if (event) document.getElementById("jobs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function runSearch(overrides: { category?: string; company?: string } = {}) {
     setBusy(true); setError("");
     try {
-      const data = await fetchMarketJobs({ query, location, mode, limit: 60 }) as JobsResponse;
+      const data = await fetchMarketJobs({ query, location, mode, company: overrides.company ?? company, category: overrides.category ?? category, careerLevel, employmentType, postedWithinDays, sort, limit: 100 });
       setJobs(data.jobs); setMeta(data); setSelected(data.jobs[0] || null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load live jobs.");
-    } finally { setBusy(false); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load jobs."); }
+    finally { setBusy(false); }
   }
+
+  function chooseCategory(value: string) { setCategory(value); void runSearch({ category: value }); }
+  function chooseCompany(value: string) { setCompany(value); void runSearch({ company: value }); }
+  const categories = useMemo(() => meta?.categories?.length ? meta.categories.filter((item) => item !== "Other").slice(0, 8) : FALLBACK_CATEGORIES, [meta]);
+  const companies = useMemo(() => meta?.companies?.slice(0, 10) || [], [meta]);
 
   return <main className="public-shell">
     <header className="public-header">
       <button className="public-brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>H</span> Hirova</button>
-      <nav aria-label="Public navigation"><a href="#jobs">Jobs</a><a href="#how-it-works">How it works</a><button onClick={() => onSignIn("recruiter")}>For employers</button><button onClick={() => onSignIn("job_seeker")}>Sign in</button><button className="public-join" onClick={() => onSignIn("job_seeker")}>Create profile</button></nav>
+      <nav aria-label="Public navigation"><a href="#jobs">Jobs</a><a href="#companies">Companies</a><button onClick={() => onSignIn("recruiter")}>For employers</button><button onClick={() => onSignIn("job_seeker")}>Log in</button><button className="public-join" onClick={() => onSignIn("job_seeker")}>Register</button></nav>
     </header>
 
     <section className="public-hero">
-      <div><span className="public-kicker"><i /> LIVE, SOURCE-LINKED OPENINGS</span><h1>Get hired<br/><em>smarter.</em></h1></div>
-      <aside><b>{meta?.marketTotal ? meta.marketTotal.toLocaleString("en-IN") : "2,000+"}</b><span>live openings indexed</span><small>Updated from original sources—not generated listings</small></aside>
+      <div><span className="public-kicker"><i /> OPPORTUNITIES ACROSS INDIA AND WORLDWIDE</span><h1>Get hired<br/><em>smarter.</em></h1><p>Search roles by skills, company, location, experience and the way you want to work.</p></div>
+      <aside><b>{meta?.marketTotal ? `${meta.marketTotal.toLocaleString("en-IN")}+` : "5,000+"}</b><span>live openings</span><small>Across India and worldwide</small></aside>
     </section>
 
-    <form className="public-search" onSubmit={search} id="jobs">
-      <label><span>ROLE, SKILL OR COMPANY</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Product designer, Python" /></label>
-      <label><span>LOCATION</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="e.g. Bengaluru, Remote" /></label>
-      <label><span>WORK MODE</span><select value={mode} onChange={(event) => setMode(event.target.value)}><option>All</option><option>Remote</option><option>Hybrid</option><option>On-site</option></select></label>
-      <button disabled={busy}>{busy ? "Refreshing…" : "Search jobs"}</button>
+    <form className="public-search public-search-primary" onSubmit={search}>
+      <label><span>ROLE, SKILL OR COMPANY</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Software engineer, Java, product design" /></label>
+      <label><span>LOCATION</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Bengaluru, Mumbai, Remote" /></label>
+      <label><span>EXPERIENCE LEVEL</span><select value={careerLevel} onChange={(event) => setCareerLevel(event.target.value)}><option value="All">All experience levels</option>{CAREER_LEVELS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+      <button disabled={busy}>{busy ? "Searching…" : "Search jobs"}</button>
     </form>
 
-    <section className="public-results">
-      <div className="public-result-head"><div><span className="public-kicker"><i /> LIVE MARKET</span><h2>{busy ? "Refreshing current openings…" : `${meta?.total?.toLocaleString("en-IN") || jobs.length} roles found`}</h2></div><p>{meta?.updatedAt ? `Last refreshed ${new Date(meta.updatedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : "Direct employer and public job feeds"}</p></div>
-      {error ? <div className="public-error"><b>We couldn’t refresh the market.</b><p>{error}</p><button onClick={() => search()}>Try again</button></div> : <div className="public-grid">
-        <div className="public-list" aria-label="Job results">{jobs.map((job) => <button key={job.id} className={selected?.id === job.id ? "selected" : ""} onClick={() => setSelected(job)}><span className={`company-logo ${job.color}`}>{job.logo}</span><div><b>{job.title}</b><p>{job.company} · {job.location}</p><small>{job.mode} · {job.posted} · {job.source}</small></div><em>{job.match}%</em></button>)}</div>
-        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">{selected.source?.includes("· Hirova") ? "Posted directly" : "Employer source"} · {selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>TYPE</small>{selected.employmentType || "See listing"}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><button className="public-apply" onClick={() => onSignIn("job_seeker")}>Sign in to apply <span>→</span></button><small className="source-note">You can search every public listing here. Sign in to view the application link, save jobs and track applications.</small></article>}
+    <section className="public-discovery" aria-label="Job search filters">
+      <select value={company} onChange={(event) => setCompany(event.target.value)} aria-label="Company"><option value="">All companies</option>{meta?.companies?.map((item) => <option key={item}>{item}</option>)}</select>
+      <select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Job category"><option>All</option>{categories.map((item) => <option key={item}>{item}</option>)}</select>
+      <select value={mode} onChange={(event) => setMode(event.target.value)} aria-label="Work mode"><option>All</option><option>Remote</option><option>Hybrid</option><option>On-site</option></select>
+      <select value={employmentType} onChange={(event) => setEmploymentType(event.target.value)} aria-label="Employment type"><option>All</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Temporary</option></select>
+      <select value={postedWithinDays} onChange={(event) => setPostedWithinDays(Number(event.target.value))} aria-label="Date posted"><option value={1}>Past 24 hours</option><option value={7}>Past 7 days</option><option value={30}>Past 30 days</option></select>
+      <select value={sort} onChange={(event) => setSort(event.target.value as "relevance" | "newest")} aria-label="Sort jobs"><option value="relevance">Most relevant</option><option value="newest">Newest first</option></select>
+      <button onClick={() => void search()}>Apply filters</button>
+    </section>
+
+    <section className="public-browse" id="categories"><div className="public-section-title"><span>Browse by category</span><button onClick={() => { setCategory("All"); void runSearch({ category: "All" }); }}>View all jobs →</button></div><div className="browse-grid">{categories.map((item) => <button key={item} onClick={() => chooseCategory(item)}><span>{categoryIcon(item)}</span><b>{item}</b><i>→</i></button>)}</div></section>
+
+    {companies.length > 0 && <section className="public-companies" id="companies"><div className="public-section-title"><span>Companies hiring now</span><button onClick={() => { setCompany(""); void runSearch({ company: "" }); }}>Explore companies →</button></div><div>{companies.map((item) => <button key={item} onClick={() => chooseCompany(item)}><span>{item.slice(0, 1).toUpperCase()}</span><b>{item}</b><small>View jobs</small></button>)}</div></section>}
+
+    <section className="public-results" id="jobs">
+      <div className="public-result-head"><div><span className="public-kicker"><i /> JOBS</span><h2>{busy ? "Finding current openings…" : `${meta?.total?.toLocaleString("en-IN") || jobs.length} roles found`}</h2></div><p>Posted within the past {postedWithinDays === 1 ? "24 hours" : `${postedWithinDays} days`}</p></div>
+      {error ? <div className="public-error"><b>Jobs are temporarily unavailable.</b><p>{error}</p><button onClick={() => void search()}>Try again</button></div> : <div className="public-grid">
+        <div className="public-list" aria-label="Job results">{jobs.map((job) => <button key={job.id} className={selected?.id === job.id ? "selected" : ""} onClick={() => setSelected(job)}><span className={`company-logo ${job.color}`}>{job.logo}</span><div><b>{job.title}</b><p>{job.company} · {job.location}</p><small>{job.employmentType || "Full-time"} · {job.mode} · {job.posted}</small></div><em>{job.origin === "recruiter" ? "Hirova" : "View"}</em></button>)}</div>
+        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">{selected.origin === "recruiter" ? "Posted on Hirova" : selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>EXPERIENCE</small>{selected.experience}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><button className="public-apply" onClick={() => onSignIn("job_seeker")}>Log in to apply <span>→</span></button></article>}
       </div>}
     </section>
 
-    <section className="public-how" id="how-it-works"><span className="public-kicker">HOW HIROVA WORKS</span><h2>A serious job search, with useful AI in the background.</h2><div><article><b>01</b><h3>Build your profile</h3><p>Add your resume, skills, preferences, experience and target roles.</p></article><article><b>02</b><h3>Rank real openings</h3><p>Hirova compares your evidence with current, source-linked job listings.</p></article><article><b>03</b><h3>Apply and stay organised</h3><p>Apply at the original source, then track progress, notes and preparation here.</p></article></div></section>
-    <footer className="public-footer"><b><span>H</span> Hirova</b><p>Get hired smarter.</p><small>{meta?.sourceNotice || "Job availability is controlled by original publishers."}</small></footer>
+    <footer className="public-footer"><b><span>H</span> Hirova</b><p>Get hired smarter.</p><nav><a href="#privacy">Privacy</a><a href="#terms">Terms</a><button onClick={() => onSignIn("recruiter")}>Employers</button></nav></footer>
   </main>;
+}
+
+function categoryIcon(category: string) {
+  if (category === "Technology") return "⌘"; if (category === "Product") return "◫";
+  if (category === "Design") return "◇"; if (category === "Sales") return "↗";
+  if (category === "Marketing") return "◎"; if (category === "Finance") return "₹";
+  if (category === "Human Resources") return "◉"; return "▦";
 }

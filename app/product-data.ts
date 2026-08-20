@@ -21,6 +21,14 @@ export type Job = {
   source?: string;
   sourceUrl?: string;
   employmentType?: string;
+  category?: string;
+  careerLevel?: "intern" | "early" | "mid" | "senior";
+  minExperienceYears?: number | null;
+  maxExperienceYears?: number | null;
+  experienceConfidence?: "low" | "medium" | "high";
+  applicationMethod?: "native" | "external" | "both";
+  origin?: "aggregated" | "recruiter";
+  recruiterJobId?: string | null;
 };
 
 // 1. Seed jobs make every product workflow usable while the ingestion API is empty.

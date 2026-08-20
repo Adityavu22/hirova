@@ -40,7 +40,7 @@ test("redirects www traffic to the canonical Hirova domain", async () => {
 test("keeps application links behind authentication", async () => {
   // 4. The public UI never renders an outbound application URL.
   const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
-  assert.match(portal, /Sign in to apply/);
+  assert.match(portal, /Log in to apply/);
   assert.doesNotMatch(portal, /href=\{selected\.sourceUrl\}/);
 
   // 5. The database boundary also removes source_url and revokes anonymous table access.
@@ -75,4 +75,29 @@ test("protects recruiter-owned company listings", async () => {
   assert.match(migration, /recruiter_id = \(select auth\.uid\(\)\)/);
   assert.match(migration, /sync_recruiter_job_to_market/);
   assert.doesNotMatch(migration.match(/grant select \([\s\S]*?\) on public\.job_market to anon/i)?.[0] || "", /source_url|apply_url/i);
+});
+
+test("uses email and Google authentication without a phone login flow", async () => {
+  // 8. Authentication intentionally offers only email and Google.
+  const auth = await readFile(new URL("../app/auth.tsx", import.meta.url), "utf8");
+  const exampleEnv = await readFile(new URL("../.env.example", import.meta.url), "utf8");
+  assert.match(auth, /Continue with Google/);
+  assert.match(auth, /EMAIL ADDRESS/);
+  assert.match(auth, /PASSWORD/);
+  assert.doesNotMatch(auth, /signInWithOtp\(\{\s*phone|phoneTab|PHONE_AUTH_ENABLED/i);
+  assert.doesNotMatch(exampleEnv, /phone OTP|PHONE_AUTH_ENABLED/i);
+});
+
+test("supports focused job discovery and native applicant management", async () => {
+  // 9. Discovery is limited to fresh jobs and includes marketplace-grade filters.
+  const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
+  const recruiter = await readFile(new URL("../app/recruiter-dashboard.tsx", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/20260820095226_unify_marketplace_data.sql", import.meta.url), "utf8");
+  for (const token of ["24 hours", "7 days", "30 days", "Browse by category", "Companies hiring"]) assert.match(portal, new RegExp(token, "i"));
+  assert.match(migration, /least\(greatest\(p_posted_within_days, 1\), 30\)/i);
+  assert.match(migration, /create table public\.job_applications/i);
+  assert.match(migration, /create table public\.application_notes/i);
+  assert.match(recruiter, /ApplicantManager/);
+  assert.match(recruiter, /Resume ·/);
+  assert.match(recruiter, /Interview/);
 });

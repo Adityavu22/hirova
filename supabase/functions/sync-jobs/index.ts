@@ -141,12 +141,15 @@ function normalize(input: RawJob): NormalizedJob {
   const mode = input.remote || /remote|anywhere|distributed/i.test(input.location) ? "Remote" : /hybrid/i.test(input.location) ? "Hybrid" : "On-site";
   const postedAt = validDate(input.postedAt);
   const skills = [...new Set([...input.skills, ...inferSkills(`${input.title} ${input.description}`)])].slice(0, 7);
+  const experience = inferExperienceMeta(`${input.title} ${input.description}`);
   return {
     id: input.id, title: input.title || "Open role", company: input.company || "Employer", location: input.location || "See listing", salary: input.salary || "Salary not disclosed",
-    mode, experience: inferExperience(`${input.title} ${input.description}`), match: 70, logo: (input.company || "H").slice(0, 1).toUpperCase(), color: colorFor(input.company),
+    mode, experience: experience.label, match: 70, logo: (input.company || "H").slice(0, 1).toUpperCase(), color: colorFor(input.company),
     posted: relativeDate(postedAt), posted_at: postedAt, skills: skills.length ? skills : ["Role-specific skills"], missing: ["Review full requirements"],
     why: "Match score is calculated from your profile, skills, preferences, and the available listing details.", description: compact(input.description) || "Open the original listing for complete details.",
     responsibilities: ["Review complete responsibilities on the original posting"], benefits: [], applicants: 0, source: input.source, source_url: input.url, employment_type: input.employmentType || "Full-time",
+    category: inferCategory(input.title), min_experience_years: experience.min, max_experience_years: experience.max,
+    career_level: experience.careerLevel, experience_confidence: experience.confidence, application_method: "external",
   };
 }
 
@@ -168,8 +171,13 @@ async function finishRun(url: string, key: string, id: string, status: string, j
 
 function getSecretKey() { const modern = Deno.env.get("SUPABASE_SECRET_KEYS"); if (modern) { const keys = JSON.parse(modern); if (keys.default) return keys.default; } return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); }
 function dedupe(jobs: NormalizedJob[]) { const seen = new Set<string>(); return jobs.filter((job) => { const key = `${job.company}|${job.title}|${job.location}`.toLowerCase().replace(/\s+/g, " "); if (seen.has(key)) return false; seen.add(key); return true; }); }
-function inferSkills(value: string) { const bank = ["Python","JavaScript","TypeScript","React","Node.js","Java","Go","SQL","AWS","Azure","GCP","Kubernetes","Machine learning","Product management","Product design","Figma","Data analysis","Sales","Marketing","Finance","Operations","Security"]; const lower = value.toLowerCase(); return bank.filter((skill) => lower.includes(skill.toLowerCase())); }
-function inferExperience(value: string) { const match = value.match(/(\d+)\+?\s*(?:-|to)?\s*(\d+)?\s*years?/i); return match ? `${match[1]}${match[2] ? `-${match[2]}` : "+"} yrs` : "See listing"; }
+function inferSkills(value: string) { const bank = ["Python","JavaScript","TypeScript","React","Node.js","Java","Go","SQL","AWS","Azure","GCP","Kubernetes","Machine learning","Product management","Product design","Figma","Data analysis","Sales","Marketing","Finance","Operations","Security"]; return bank.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i").test(value)); }
+function inferExperienceMeta(value: string) {
+  const match = value.match(/(\d+)\+?\s*(?:-|–|to)?\s*(\d+)?\s*years?/i); const min = match ? Number(match[1]) : null; const max = match?.[2] ? Number(match[2]) : null; const lower = value.toLowerCase();
+  const careerLevel = /\b(intern|internship|trainee)\b/.test(lower) ? "intern" : /\b(principal|director|head|staff|lead|vp|vice president)\b/.test(lower) || (min !== null && min > 10) ? "senior" : /\b(senior|manager)\b/.test(lower) || (min !== null && min >= 5) ? "mid" : "early";
+  return { label: match ? `${match[1]}${match[2] ? `-${match[2]}` : "+"} yrs` : "Experience not specified", min, max, careerLevel, confidence: match ? "high" : /\b(intern|junior|associate|senior|manager|lead|staff|principal|director|head)\b/.test(lower) ? "medium" : "low" };
+}
+function inferCategory(value: string) { const title = value.toLowerCase(); if (/\b(product manager|product owner)\b/.test(title)) return "Product"; if (/\b(designer|design|ux|ui)\b/.test(title)) return "Design"; if (/\b(sales|business development|account executive)\b/.test(title)) return "Sales"; if (/\b(marketing|growth|content|brand)\b/.test(title)) return "Marketing"; if (/\b(finance|accountant|audit|tax)\b/.test(title)) return "Finance"; if (/\b(human resources|recruiter|talent|people)\b/.test(title)) return "Human Resources"; if (/\b(operations|supply chain|customer support|customer success)\b/.test(title)) return "Operations"; if (/\b(software|developer|engineer|devops|cloud|security|data|machine learning|ai)\b/.test(title)) return "Technology"; return "Other"; }
 function colorFor(value: string) { const colors = ["blue","plum","orange","green-logo","teal-logo","black-logo"]; return colors[Math.abs([...value].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % colors.length]; }
 function validDate(value: string) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? new Date().toISOString() : date.toISOString(); }
 function relativeDate(value: string) { const days = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 86400000)); return days === 0 ? "Today" : days === 1 ? "Yesterday" : `${days} days ago`; }
