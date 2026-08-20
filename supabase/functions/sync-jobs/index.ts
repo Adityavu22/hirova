@@ -12,6 +12,11 @@ const GREENHOUSE_BOARDS = [
   ["PhonePe", "phonepe"], ["Groww", "groww"],
 ] as const;
 
+const LEVER_BOARDS = [
+  ["Palantir", "palantir"], ["Acceldata", "acceldata"], ["Saviynt", "saviynt"], ["100ms", "100ms"],
+  ["Neuron7", "neuron7"], ["Fam", "fampay"], ["Hevo Data", "hevodata"], ["Gushwork", "gushwork"], ["Paytm", "paytm"],
+] as const;
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -31,7 +36,7 @@ Deno.serve(async (request: Request) => {
     const loaders = [
       ["Arbeitnow", loadArbeitnow()], ["Remotive", loadRemotive()],
       ...GREENHOUSE_BOARDS.map(([company, token]) => [`${company} careers`, loadGreenhouse(company, token)] as const),
-      ["Palantir careers", loadLever("Palantir", "palantir")],
+      ...LEVER_BOARDS.map(([company, token]) => [`${company} careers`, loadLever(company, token)] as const),
     ] as const;
     const settled = await Promise.allSettled(loaders.map(([, promise]) => promise));
     const jobs = dedupe(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
@@ -93,8 +98,13 @@ async function loadGreenhouse(company: string, token: string): Promise<Normalize
 }
 
 async function loadLever(company: string, token: string): Promise<NormalizedJob[]> {
-  const data = await fetchJson<Array<Record<string, unknown>>>(`https://api.lever.co/v0/postings/${token}?mode=json&limit=100`);
-  return data.map((job) => { const categories = (job.categories || {}) as Record<string, unknown>; return normalize({
+  const postings: Array<Record<string, unknown>> = [];
+  for (let skip = 0; skip < 500; skip += 100) {
+    const page = await fetchJson<Array<Record<string, unknown>>>(`https://api.lever.co/v0/postings/${token}?mode=json&limit=100&skip=${skip}`);
+    postings.push(...page);
+    if (page.length < 100) break;
+  }
+  return postings.map((job) => { const categories = (job.categories || {}) as Record<string, unknown>; return normalize({
     id: `lever:${token}:${job.id}`, title: text(job.text), company, location: text(categories.location) || "Location in job post", url: text(job.hostedUrl),
     postedAt: typeof job.createdAt === "number" ? new Date(job.createdAt).toISOString() : new Date().toISOString(), description: stripHtml(text(job.descriptionPlain) || text(job.description)),
     skills: inferSkills(`${text(job.text)} ${text(categories.team)}`), employmentType: text(categories.commitment) || "Full-time", source: `${company} careers`, remote: /remote/i.test(text(categories.location)),

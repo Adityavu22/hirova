@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 let cachedWorker;
@@ -34,4 +35,29 @@ test("redirects www traffic to the canonical Hirova domain", async () => {
   const response = await render("https://www.hirova.in/jobs?role=designer");
   assert.equal(response.status, 308);
   assert.equal(response.headers.get("location"), "https://hirova.in/jobs?role=designer");
+});
+
+test("keeps application links behind authentication", async () => {
+  // 4. The public UI never renders an outbound application URL.
+  const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
+  assert.match(portal, /Sign in to apply/);
+  assert.doesNotMatch(portal, /href=\{selected\.sourceUrl\}/);
+
+  // 5. The database boundary also removes source_url and revokes anonymous table access.
+  const migration = await readFile(new URL("../supabase/migrations/20260820094500_gate_application_links_and_local_search.sql", import.meta.url), "utf8");
+  assert.match(migration, /revoke select on public\.job_market from anon/i);
+  assert.match(migration, /to_jsonb\(p\) - 'search_document' - 'source_url'/i);
+  assert.match(migration, /search_public_job_market/i);
+
+  const hardening = await readFile(new URL("../supabase/migrations/20260820103000_harden_public_job_search_permissions.sql", import.meta.url), "utf8");
+  assert.match(hardening, /security invoker/i);
+  assert.doesNotMatch(hardening.match(/grant select \([\s\S]*?\) on public\.job_market to anon/i)?.[0] || "", /source_url/i);
+});
+
+test("loads India-first jobs from local employer boards", async () => {
+  // 6. Public discovery starts in India and the scheduled sync includes India-focused sources.
+  const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
+  const sync = await readFile(new URL("../supabase/functions/sync-jobs/index.ts", import.meta.url), "utf8");
+  assert.match(portal, /useState\("India"\)/);
+  for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm"]) assert.match(sync, new RegExp(`"${token}"`));
 });

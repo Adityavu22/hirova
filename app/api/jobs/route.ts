@@ -1,4 +1,5 @@
 import snapshot from "../../job-snapshot.json";
+import { jsonError, requireUser } from "../_shared";
 
 type PublicJob = {
   id: string;
@@ -31,8 +32,18 @@ const GREENHOUSE_BOARDS = [
   ["PhonePe", "phonepe"], ["Groww", "groww"],
 ] as const;
 
+const LEVER_BOARDS = [
+  ["Palantir", "palantir"], ["Acceldata", "acceldata"], ["Saviynt", "saviynt"], ["100ms", "100ms"],
+  ["Neuron7", "neuron7"], ["Fam", "fampay"], ["Hevo Data", "hevodata"], ["Gushwork", "gushwork"], ["Paytm", "paytm"],
+] as const;
+
 // 1. Aggregate only documented public feeds and direct employer job-board APIs.
 export async function GET(request: Request) {
+  const hasSession = Boolean(request.headers.get("authorization"));
+  if (hasSession) {
+    try { await requireUser(request); }
+    catch (error) { return jsonError(error); }
+  }
   const url = new URL(request.url);
   const query = clean(url.searchParams.get("query") || "").toLowerCase();
   const location = clean(url.searchParams.get("location") || "").toLowerCase();
@@ -45,24 +56,25 @@ export async function GET(request: Request) {
     loadArbeitnow(),
     loadRemotive(),
     ...GREENHOUSE_BOARDS.map(([company, token]) => loadGreenhouse(company, token)),
-    loadLever("Palantir", "palantir"),
+    ...LEVER_BOARDS.map(([company, token]) => loadLever(company, token)),
   ];
+  const sourceLabels = ["Arbeitnow", "Remotive", ...GREENHOUSE_BOARDS.map(([company]) => `${company} careers`), ...LEVER_BOARDS.map(([company]) => `${company} careers`)];
   const settled = await Promise.allSettled(sources);
   const liveJobs = dedupe(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
   const usingSnapshot = forceSnapshot || liveJobs.length === 0;
   const jobs = usingSnapshot ? snapshot.jobs as PublicJob[] : liveJobs;
-  const unavailable = settled.flatMap((result, index) => result.status === "rejected" ? [sourceName(index)] : []);
+  const unavailable = settled.flatMap((result, index) => result.status === "rejected" ? [sourceLabels[index]] : []);
   const filtered = jobs.filter((job) => {
     const text = `${job.title} ${job.company} ${job.skills.join(" ")} ${job.description}`.toLowerCase();
     const matchesQuery = !query || text.includes(query) || query.split(/\s+/).every((term) => text.includes(term));
-    const matchesLocation = !location || job.location.toLowerCase().includes(location) || (location.includes("remote") && job.mode === "Remote");
+    const matchesLocation = !location || job.location.toLowerCase().includes(location) || (isIndiaQuery(location) && isIndiaLocation(job.location)) || (location.includes("remote") && job.mode === "Remote");
     const matchesMode = mode === "All" || job.mode === mode;
     return matchesQuery && matchesLocation && matchesMode;
   }).sort((a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt));
   const start = (page - 1) * pageSize;
 
   return Response.json({
-    jobs: filtered.slice(start, start + pageSize),
+    jobs: filtered.slice(start, start + pageSize).map((job) => hasSession ? job : withoutApplicationUrl(job)),
     total: filtered.length,
     marketTotal: jobs.length,
     page,
@@ -74,7 +86,7 @@ export async function GET(request: Request) {
     sourceNotice: usingSnapshot
       ? "Showing the last successful verified-source index. Applications open on the original source."
       : "Listings come from documented public feeds and employer career pages. Applications open on the original source.",
-  }, { headers: { "Cache-Control": "public, max-age=300, s-maxage=900, stale-while-revalidate=21600" } });
+  }, { headers: { "Cache-Control": hasSession ? "private, no-store" : "public, max-age=300, s-maxage=900, stale-while-revalidate=21600", Vary: "Authorization" } });
 }
 
 async function loadArbeitnow(): Promise<PublicJob[]> {
@@ -105,8 +117,14 @@ async function loadGreenhouse(company: string, token: string): Promise<PublicJob
 }
 
 async function loadLever(company: string, token: string): Promise<PublicJob[]> {
-  const data = await cachedJson<Array<Record<string, unknown>>>(`https://api.lever.co/v0/postings/${token}?mode=json&limit=100`, 1800);
-  return (Array.isArray(data) ? data : []).map((job) => {
+  const postings: Array<Record<string, unknown>> = [];
+  for (let skip = 0; skip < 500; skip += 100) {
+    const page = await cachedJson<Array<Record<string, unknown>>>(`https://api.lever.co/v0/postings/${token}?mode=json&limit=100&skip=${skip}`, 1800);
+    if (!Array.isArray(page)) break;
+    postings.push(...page);
+    if (page.length < 100) break;
+  }
+  return postings.map((job) => {
     const categories = (job.categories || {}) as Record<string, unknown>;
     return normalize({
       id: `lever:${token}:${job.id}`, title: text(job.text), company, location: text(categories.location) || "Location in job post", url: text(job.hostedUrl),
@@ -158,5 +176,6 @@ function decodeHtml(value: string) { return stripHtml(value.replace(/&lt;/g,"<")
 function clean(value: string) { return value.replace(/\s+/g, " ").trim(); }
 function text(value: unknown) { return typeof value === "string" || typeof value === "number" ? String(value) : ""; }
 function strings(value: unknown) { return Array.isArray(value) ? value.map(text).filter(Boolean) : []; }
-function sourceName(index: number) { if (index === 0) return "Arbeitnow"; if (index === 1) return "Remotive"; if (index === sourcesCount() - 1) return "Palantir careers"; return `${GREENHOUSE_BOARDS[index - 2]?.[0] || "Employer"} careers`; }
-function sourcesCount() { return 3 + GREENHOUSE_BOARDS.length; }
+function isIndiaQuery(value: string) { return value === "in" || value.includes("india"); }
+function isIndiaLocation(value: string) { return /india|bengaluru|bangalore|mumbai|delhi|noida|gurugram|gurgaon|hyderabad|pune|chennai|kolkata|ahmedabad|jaipur|kochi|cochin|chandigarh|indore/i.test(value); }
+function withoutApplicationUrl(job: PublicJob) { const publicJob = { ...job } as Partial<PublicJob>; delete publicJob.sourceUrl; return publicJob; }

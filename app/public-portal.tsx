@@ -15,7 +15,7 @@ type JobsResponse = {
 
 export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
   const [query, setQuery] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState("India");
   const [mode, setMode] = useState("All");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<Job | null>(null);
@@ -26,7 +26,7 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
   useEffect(() => {
     // 1. Load the daily market once without coupling the initial request to editable form state.
     let active = true;
-    void fetchMarketJobs({ limit: 60 })
+    void fetchMarketJobs({ location: "India", limit: 60 })
       .then((data) => {
         if (!active) return;
         setJobs(data.jobs); setMeta(data as JobsResponse); setSelected(data.jobs[0] || null);
@@ -71,7 +71,7 @@ export default function PublicPortal({ onSignIn }: { onSignIn: () => void }) {
       <div className="public-result-head"><div><span className="public-kicker"><i /> LIVE MARKET</span><h2>{busy ? "Refreshing current openings…" : `${meta?.total?.toLocaleString("en-IN") || jobs.length} roles found`}</h2></div><p>{meta?.updatedAt ? `Last refreshed ${new Date(meta.updatedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : "Direct employer and public job feeds"}</p></div>
       {error ? <div className="public-error"><b>We couldn’t refresh the market.</b><p>{error}</p><button onClick={() => search()}>Try again</button></div> : <div className="public-grid">
         <div className="public-list" aria-label="Job results">{jobs.map((job) => <button key={job.id} className={selected?.id === job.id ? "selected" : ""} onClick={() => setSelected(job)}><span className={`company-logo ${job.color}`}>{job.logo}</span><div><b>{job.title}</b><p>{job.company} · {job.location}</p><small>{job.mode} · {job.posted} · {job.source}</small></div><em>{job.match}%</em></button>)}</div>
-        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">Verified source · {selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>TYPE</small>{selected.employmentType || "See listing"}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><a className="public-apply" href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Apply on original listing <span>↗</span></a><button className="public-personalise" onClick={onSignIn}>Sign in to save and personalise</button><small className="source-note">Applications are completed on the employer or source website. Hirova never invents openings.</small></article>}
+        {selected && <article className="public-detail"><div className="public-detail-top"><span className={`company-logo large ${selected.color}`}>{selected.logo}</span><span className="source-pill">Verified source · {selected.source}</span></div><h2>{selected.title}</h2><p className="muted">{selected.company} · {selected.location}</p><div className="detail-facts"><span><small>COMPENSATION</small>{selected.salary}</span><span><small>WORK MODE</small>{selected.mode}</span><span><small>TYPE</small>{selected.employmentType || "See listing"}</span></div><h3>About this opening</h3><p>{selected.description}</p><div className="tags">{selected.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><button className="public-apply" onClick={onSignIn}>Sign in to apply <span>→</span></button><small className="source-note">You can search every public listing here. Sign in to view the verified application link, save jobs and track applications.</small></article>}
       </div>}
     </section>
 

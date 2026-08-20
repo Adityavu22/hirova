@@ -30,7 +30,7 @@ export default function CareerDashboard() {
   // 1. Live public listings replace seeds; the seeds remain only as an offline fallback.
   useEffect(() => {
     const controller = new AbortController();
-    fetchMarketJobs({ limit: 60 })
+    fetchMarketJobs({ limit: 60, accessToken })
       .then((data: { jobs?: Job[]; marketTotal?: number }) => {
         if (!data.jobs?.length) return;
         setMarketJobs(personalizeJobs(data.jobs, store.profile));
@@ -38,7 +38,7 @@ export default function CareerDashboard() {
         setJobsLive(true);
       }).catch(() => undefined);
     return () => controller.abort();
-  }, [store.profile]);
+  }, [accessToken, store.profile]);
 
   const visibleJobs = useMemo(() => marketJobs.filter((job) => {
     const needle = query.toLowerCase().trim();

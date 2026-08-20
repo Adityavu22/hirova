@@ -41,7 +41,7 @@ This is the honest production map against the supplied 52-area Naukri/Indeed fun
 | 35 | Candidate analytics | Partial | Saved/applied/profile-strength summaries exist; search and funnel analytics remain. |
 | 36 | Notifications | Partial | In-app surface exists; event-driven inbox, preferences, email and push remain. |
 | 37 | Search/recommendation infrastructure | Partial | Durable Supabase/Postgres full-text index, filters, cache and explainable ranking; vector reranking and feedback calibration remain. |
-| 38 | Aggregation/feed management | Operational | Thirteen documented feeds/employer boards, dedupe, source links, daily refresh, failure telemetry and safe stale-record handling. |
+| 38 | Aggregation/feed management | Operational | Twenty-one documented feeds/employer boards, including India-focused employers, with dedupe, authenticated source links, daily refresh, failure telemetry and safe stale-record handling. |
 | 39 | Moderation | Not yet | Requires queues, policy enforcement, appeals and auditability. |
 | 40 | Trust/fraud | Partial | Only documented sources are accepted; reporting, employer verification and fraud scoring remain. |
 | 41 | Admin | Not yet | Requires role-based operational console. |
