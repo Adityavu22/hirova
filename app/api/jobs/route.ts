@@ -72,7 +72,15 @@ export async function GET(request: Request) {
   const postedWithinDays = Math.min(30, Math.max(1, Number(url.searchParams.get("postedWithinDays")) || 30));
   const sort = clean(url.searchParams.get("sort") || "relevance");
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-  const pageSize = Math.min(2500, Math.max(12, Number(url.searchParams.get("limit")) || 30));
+  const pageSize = Math.min(250, Math.max(12, Number(url.searchParams.get("limit")) || 30));
+  const start = (page - 1) * pageSize;
+
+  // 2. Serve the durable daily index first; public callers never receive application URLs.
+  const indexed = await loadIndexedFeed(request, {
+    query, location, mode, company, category, careerLevel, employmentType,
+    postedWithinDays, sort, pageSize, start,
+  });
+  if (indexed) return Response.json(indexed, { headers: { "Cache-Control": hasSession ? "private, no-store" : "public, max-age=300, s-maxage=900, stale-while-revalidate=21600", Vary: "Authorization" } });
 
   const forceSnapshot = url.searchParams.get("snapshot") === "1" || process.env.JOB_FEED_MODE === "snapshot";
   const sources = forceSnapshot ? [] : [
@@ -101,8 +109,6 @@ export async function GET(request: Request) {
     const matchesDate = Date.parse(job.postedAt) >= Date.now() - postedWithinDays * 86400000;
     return matchesQuery && matchesLocation && matchesMode && matchesCompany && matchesCategory && matchesCareer && matchesType && matchesDate;
   }).sort((a, b) => sort === "newest" ? Date.parse(b.postedAt) - Date.parse(a.postedAt) : Date.parse(b.postedAt) - Date.parse(a.postedAt));
-  const start = (page - 1) * pageSize;
-
   return Response.json({
     jobs: filtered.slice(start, start + pageSize).map((job) => hasSession ? job : withoutApplicationUrl(job)),
     total: filtered.length,
@@ -119,6 +125,51 @@ export async function GET(request: Request) {
       ? "Showing the last successful verified-source index. Applications open on the original source."
       : "Listings come from documented public feeds and employer career pages. Applications open on the original source.",
   }, { headers: { "Cache-Control": hasSession ? "private, no-store" : "public, max-age=300, s-maxage=900, stale-while-revalidate=21600", Vary: "Authorization" } });
+}
+
+async function loadIndexedFeed(request: Request, input: { query: string; location: string; mode: string; company: string; category: string; careerLevel: string; employmentType: string; postedWithinDays: number; sort: string; pageSize: number; start: number }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !key) return null;
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const rpc = token ? "search_job_market_v2" : "search_public_job_market_v2";
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpc}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${token || key}` },
+      body: JSON.stringify({
+        p_query: input.query, p_location: input.location, p_mode: input.mode,
+        p_company: input.company, p_category: input.category, p_career_level: input.careerLevel,
+        p_employment_type: input.employmentType, p_posted_within_days: input.postedWithinDays,
+        p_sort: input.sort, p_limit: input.pageSize, p_offset: input.start,
+      }),
+    });
+    if (!response.ok) return null;
+    const raw = await response.json() as Record<string, unknown> | Array<Record<string, unknown>>;
+    const feed = (Array.isArray(raw) ? raw[0] : raw) || {};
+    const jobs = Array.isArray(feed.jobs) ? feed.jobs.map(fromIndexedJob) : [];
+    const total = Number(feed.total || 0);
+    return {
+      ...feed, jobs, total, page: Math.floor(input.start / input.pageSize) + 1, pageSize: input.pageSize,
+      hasMore: input.start + jobs.length < total, usingSnapshot: false,
+      updatedAt: typeof feed.updatedAt === "string" ? feed.updatedAt : new Date().toISOString(),
+      sourceNotice: "Daily job index",
+    };
+  } catch { return null; }
+}
+
+function fromIndexedJob(value: Record<string, unknown>): PublicJob {
+  const { posted_at, source_url, employment_type, career_level, min_experience_years, max_experience_years, experience_confidence, application_method, recruiter_job_id, ...job } = value;
+  return {
+    ...job,
+    postedAt: text(posted_at), sourceUrl: text(source_url) || undefined,
+    employmentType: text(employment_type), careerLevel: career_level as PublicJob["careerLevel"],
+    minExperienceYears: typeof min_experience_years === "number" ? min_experience_years : null,
+    maxExperienceYears: typeof max_experience_years === "number" ? max_experience_years : null,
+    experienceConfidence: experience_confidence as PublicJob["experienceConfidence"],
+    applicationMethod: application_method as PublicJob["applicationMethod"],
+    recruiterJobId: typeof recruiter_job_id === "string" ? recruiter_job_id : null,
+  } as PublicJob;
 }
 
 async function loadArbeitnow(): Promise<PublicJob[]> {

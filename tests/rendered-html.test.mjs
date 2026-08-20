@@ -92,11 +92,14 @@ test("supports focused job discovery and native applicant management", async () 
   // 9. Discovery is limited to fresh jobs and includes marketplace-grade filters.
   const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
   const recruiter = await readFile(new URL("../app/recruiter-dashboard.tsx", import.meta.url), "utf8");
+  const jobsApi = await readFile(new URL("../app/api/jobs/route.ts", import.meta.url), "utf8");
   const migration = await readFile(new URL("../supabase/migrations/20260820095226_unify_marketplace_data.sql", import.meta.url), "utf8");
   for (const token of ["24 hours", "7 days", "30 days", "Browse by category", "Companies hiring"]) assert.match(portal, new RegExp(token, "i"));
   assert.match(migration, /least\(greatest\(p_posted_within_days, 1\), 30\)/i);
   assert.match(migration, /create table public\.job_applications/i);
   assert.match(migration, /create table public\.application_notes/i);
+  assert.match(jobsApi, /search_public_job_market_v2/);
+  assert.match(jobsApi, /Serve the durable daily index first/);
   assert.match(recruiter, /ApplicantManager/);
   assert.match(recruiter, /Resume ·/);
   assert.match(recruiter, /Interview/);
