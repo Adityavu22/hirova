@@ -100,6 +100,7 @@ test("supports focused job discovery and native applicant management", async () 
   assert.match(migration, /create table public\.application_notes/i);
   assert.match(jobsApi, /search_public_job_market_v2/);
   assert.match(jobsApi, /Serve the durable daily index first/);
+  assert.match(jobsApi, /map\(enrichSnapshotJob\)/);
   assert.match(recruiter, /ApplicantManager/);
   assert.match(recruiter, /Resume ·/);
   assert.match(recruiter, /Interview/);

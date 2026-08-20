@@ -94,7 +94,7 @@ export async function GET(request: Request) {
   const settled = await Promise.allSettled(sources);
   const liveJobs = dedupe(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
   const usingSnapshot = forceSnapshot || liveJobs.length === 0;
-  const jobs = usingSnapshot ? snapshot.jobs as PublicJob[] : liveJobs;
+  const jobs = usingSnapshot ? (snapshot.jobs as PublicJob[]).map(enrichSnapshotJob) : liveJobs;
   const unavailable = settled.flatMap((result, index) => result.status === "rejected" ? [sourceLabels[index]] : []);
   const currentJobs = jobs.filter((job) => Date.parse(job.postedAt) >= Date.now() - 30 * 86400000);
   const filtered = currentJobs.filter((job) => {
@@ -170,6 +170,16 @@ function fromIndexedJob(value: Record<string, unknown>): PublicJob {
     applicationMethod: application_method as PublicJob["applicationMethod"],
     recruiterJobId: typeof recruiter_job_id === "string" ? recruiter_job_id : null,
   } as PublicJob;
+}
+
+function enrichSnapshotJob(job: PublicJob): PublicJob {
+  const experience = inferExperienceMeta(`${job.title} ${job.experience} ${job.description}`);
+  return {
+    ...job, category: job.category || inferCategory(job.title), careerLevel: job.careerLevel || experience.careerLevel,
+    minExperienceYears: job.minExperienceYears ?? experience.min, maxExperienceYears: job.maxExperienceYears ?? experience.max,
+    experienceConfidence: job.experienceConfidence || experience.confidence,
+    applicationMethod: job.applicationMethod || "external", origin: job.origin || "aggregated", recruiterJobId: job.recruiterJobId || null,
+  };
 }
 
 async function loadArbeitnow(): Promise<PublicJob[]> {
