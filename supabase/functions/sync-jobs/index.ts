@@ -10,20 +10,24 @@ const GREENHOUSE_BOARDS = [
   ["Stripe", "stripe"], ["Figma", "figma"], ["Cloudflare", "cloudflare"], ["Airbnb", "airbnb"],
   ["Datadog", "datadog"], ["Discord", "discord"], ["Ripple", "ripple"], ["Postman", "postman"],
   ["PhonePe", "phonepe"], ["Groww", "groww"], ["Slice", "slice"], ["Rubrik", "rubrik"],
-  ["MongoDB", "mongodb"], ["InMobi", "inmobi"],
+  ["MongoDB", "mongodb"], ["InMobi", "inmobi"], ["AQR India", "india"],
+  ["KRAFTON India", "kraftonindia"], ["Instawork", "instawork"], ["Sigmoid", "sigmoid"],
+  ["Thoughtworks", "thoughtworks"], ["Capco", "capco"], ["Zinnov", "zinnov"],
+  ["AlphaSense India", "alphasenseindia"], ["Turing", "turing"],
 ] as const;
 
 const LEVER_BOARDS = [
   ["Palantir", "palantir"], ["Acceldata", "acceldata"], ["Saviynt", "saviynt"], ["100ms", "100ms"],
   ["Neuron7", "neuron7"], ["Fam", "fampay"], ["Hevo Data", "hevodata"], ["Gushwork", "gushwork"], ["Paytm", "paytm"],
-  ["Meesho", "meesho"], ["CRED", "cred"], ["Porter", "porter"],
+  ["Meesho", "meesho"], ["CRED", "cred"], ["Porter", "porter"], ["Zeta", "zeta"],
+  ["RapidAI", "rapidai"], ["Sitetracker", "sitetracker"], ["Kobie", "kobie"],
 ] as const;
 
 const ASHBY_BOARDS = [
   ["OpenAI", "openai"], ["Notion", "notion"], ["Cursor", "cursor"], ["Airwallex", "airwallex"],
   ["SpotDraft", "spotdraft"], ["Sarvam AI", "sarvam"], ["Ashby", "ashby"], ["Ramp", "ramp"],
   ["Linear", "linear"], ["Supabase", "supabase"], ["Perplexity", "perplexity"], ["Plaid", "plaid"],
-  ["Zapier", "zapier"],
+  ["Zapier", "zapier"], ["Bolna AI", "bolna"], ["Libra AI", "libra"],
 ] as const;
 
 Deno.serve(async (request: Request) => {

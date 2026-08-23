@@ -76,10 +76,11 @@ export function ProductStore({ children }: { children: ReactNode }) {
 
   async function setProfile(next: CandidateProfile) {
     const complete = { ...next, email: identity.email, profileComplete: true };
+    if (supabase && identity.accessToken) {
+      const { error } = await supabase.from("candidate_profiles").upsert(profileToDatabase(complete, identity.userId), { onConflict: "user_id" });
+      if (error) throw error;
+    }
     setProfileState(complete);
-    if (!supabase || !identity.accessToken) return;
-    const { error } = await supabase.from("candidate_profiles").upsert(profileToDatabase(complete, identity.userId), { onConflict: "user_id" });
-    if (error) throw error;
   }
 
   async function toggleSaved(jobId: string) {

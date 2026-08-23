@@ -59,9 +59,9 @@ test("loads India-first jobs from local employer boards", async () => {
   const portal = await readFile(new URL("../app/public-portal.tsx", import.meta.url), "utf8");
   const sync = await readFile(new URL("../supabase/functions/sync-jobs/index.ts", import.meta.url), "utf8");
   assert.match(portal, /useState\("India"\)/);
-  for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm", "meesho", "cred", "porter", "slice", "inmobi", "spotdraft", "sarvam"]) assert.match(sync, new RegExp(`"${token}"`));
+  for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm", "meesho", "cred", "porter", "slice", "inmobi", "spotdraft", "sarvam", "kraftonindia", "sigmoid", "capco", "zinnov", "alphasenseindia", "rapidai", "sitetracker", "bolna", "libra"]) assert.match(sync, new RegExp(`"${token}"`));
   assert.match(sync, /const ASHBY_BOARDS/);
-  assert.equal((sync.match(/\["[^"]+",\s*"[^"]+"\]/g) || []).length, 39);
+  assert.equal((sync.match(/\["[^"]+",\s*"[^"]+"\]/g) || []).length, 54);
 });
 
 test("protects recruiter-owned company listings", async () => {
@@ -94,7 +94,8 @@ test("supports focused job discovery and native applicant management", async () 
   const recruiter = await readFile(new URL("../app/recruiter-dashboard.tsx", import.meta.url), "utf8");
   const jobsApi = await readFile(new URL("../app/api/jobs/route.ts", import.meta.url), "utf8");
   const migration = await readFile(new URL("../supabase/migrations/20260820095226_unify_marketplace_data.sql", import.meta.url), "utf8");
-  for (const token of ["24 hours", "7 days", "30 days", "Browse by category", "Companies hiring"]) assert.match(portal, new RegExp(token, "i"));
+  for (const token of ["24 hours", "7 days", "30 days", "Browse by category"]) assert.match(portal, new RegExp(token, "i"));
+  assert.doesNotMatch(portal, /Companies hiring/i);
   assert.match(migration, /least\(greatest\(p_posted_within_days, 1\), 30\)/i);
   assert.match(migration, /create table public\.job_applications/i);
   assert.match(migration, /create table public\.application_notes/i);
@@ -104,4 +105,14 @@ test("supports focused job discovery and native applicant management", async () 
   assert.match(recruiter, /ApplicantManager/);
   assert.match(recruiter, /Resume ·/);
   assert.match(recruiter, /Interview/);
+});
+
+test("keeps candidate profiles optional and durable", async () => {
+  const dashboard = await readFile(new URL("../app/career-dashboard.tsx", import.meta.url), "utf8");
+  const store = await readFile(new URL("../app/product-store.tsx", import.meta.url), "utf8");
+  assert.match(dashboard, /useState<View>\("overview"\)/);
+  assert.match(dashboard, /All fields optional/);
+  assert.doesNotMatch(dashboard, /\brequired\b/);
+  assert.match(store, /candidate_profiles"\)\.upsert/);
+  assert.match(store, /if \(error\) throw error;[\s\S]*setProfileState\(complete\)/);
 });
