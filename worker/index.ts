@@ -29,10 +29,11 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // 1. Keep a single canonical public address while preserving deep links.
-    if (url.hostname === "www.hirova.in") {
+    // 1. Keep every public entry point on Hirova's branded domain.
+    if (url.hostname === "www.hirova.in" || url.hostname.endsWith(".chatgpt.site")) {
       url.hostname = "hirova.in";
       url.protocol = "https:";
+      url.port = "";
       return Response.redirect(url, 308);
     }
 

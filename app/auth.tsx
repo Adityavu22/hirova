@@ -12,6 +12,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const pendingRoleKey = "hirova:pending-account-type";
+const publicSiteUrl = "https://hirova.in";
 let browserClient: SupabaseClient | null | undefined;
 
 export function getBrowserSupabase() {
@@ -117,7 +118,7 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
         await pause(450);
         await onSignedIn(identityFromUser(email, email.split("@")[0].replace(/[._-]/g, " "), undefined, "demo-email", role), role);
       } else if (createAccount) {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: authReturnUrl() } });
         if (error) throw error;
         if (data.session && data.user) await onSignedIn(identityFromUser(data.user.email, undefined, data.session.access_token, data.user.id, role), role);
         else setMessage("Account created. Confirm the link sent to your email, then sign in.");
@@ -139,7 +140,7 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
         await pause(450);
         await onSignedIn(identityFromUser("preview@hirova.local", "Preview member", undefined, "demo-google", role), role);
       } else {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+        const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: authReturnUrl() } });
         if (error) throw error;
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to continue with Google."); setBusy(false); }
@@ -150,7 +151,7 @@ function AuthScreen({ supabase, initialRole, onSignedIn, onBack }: { supabase: S
     if (!/^\S+@\S+\.\S+$/.test(email)) { setMessage("Enter your email address first."); return; }
     if (!supabase) { setMessage("Password reset email is available after production authentication is connected."); return; }
     setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authReturnUrl() });
     setBusy(false);
     setMessage(error ? error.message : "Password reset link sent. Check your email.");
   }
@@ -189,5 +190,9 @@ function identityFromUser(email?: string, fullName?: string, accessToken?: strin
 }
 
 function pause(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+function authReturnUrl() {
+  if (typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) return window.location.origin;
+  return publicSiteUrl;
+}
 function readPendingRole(): AccountType | undefined { const value = typeof window === "undefined" ? null : window.localStorage.getItem(pendingRoleKey); return value === "recruiter" || value === "job_seeker" ? value : undefined; }
 function clearPendingRole() { if (typeof window !== "undefined") window.localStorage.removeItem(pendingRoleKey); }

@@ -35,6 +35,10 @@ test("redirects www traffic to the canonical Hirova domain", async () => {
   const response = await render("https://www.hirova.in/jobs?role=designer");
   assert.equal(response.status, 308);
   assert.equal(response.headers.get("location"), "https://hirova.in/jobs?role=designer");
+
+  const generatedHost = await render("https://orbit-career-copilot-aditya.sheebu-shivam.chatgpt.site/profile?tab=resume");
+  assert.equal(generatedHost.status, 308);
+  assert.equal(generatedHost.headers.get("location"), "https://hirova.in/profile?tab=resume");
 });
 
 test("keeps application links behind authentication", async () => {
@@ -84,6 +88,9 @@ test("uses email and Google authentication without a phone login flow", async ()
   assert.match(auth, /Continue with Google/);
   assert.match(auth, /EMAIL ADDRESS/);
   assert.match(auth, /PASSWORD/);
+  assert.match(auth, /const publicSiteUrl = "https:\/\/hirova\.in"/);
+  assert.match(auth, /emailRedirectTo: authReturnUrl\(\)/);
+  assert.match(auth, /redirectTo: authReturnUrl\(\)/);
   assert.doesNotMatch(auth, /signInWithOtp\(\{\s*phone|phoneTab|PHONE_AUTH_ENABLED/i);
   assert.doesNotMatch(exampleEnv, /phone OTP|PHONE_AUTH_ENABLED/i);
 });
