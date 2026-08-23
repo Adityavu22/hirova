@@ -140,7 +140,7 @@ async function loadIndexedFeed(request: Request, input: { query: string; locatio
   try {
     const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpc}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${token || key}` },
+      headers: { "Content-Type": "application/json", apikey: key, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({
         p_query: input.query, p_location: input.location, p_mode: input.mode,
         p_company: input.company, p_category: input.category, p_career_level: input.careerLevel,
