@@ -69,5 +69,7 @@ Hirova ka public web application existing edge hosting aur Supabase par chalta h
 8. New-account concurrency quota ne reserved concurrency reject ki. Compatible cost guardrail ke liye API Gateway throttle `1 request/second`, burst `2` configure kiya.
 9. Corrected application stack Mumbai region mein `CREATE_COMPLETE` hui; health HTTP 200 aur unauthenticated AI request HTTP 401 verify hui.
 10. Hirova hosting environment mein AWS API base URL configure karke edge proxy integration prepare ki.
+11. Public Site version deploy karke `hirova.in` ko canonical URL ke roop mein HTTP 200 verify kiya; unauthenticated edge copilot HTTP 401 raha.
+12. AWS MCP se independent post-deployment audit kiya: Lambda active, ECR scan complete with no findings, CloudWatch alarm OK, logs 14 days, AWS spend USD 0.
 
 Further verified deployment events will be appended here.

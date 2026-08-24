@@ -68,4 +68,10 @@ The deployment references one existing Secrets Manager JSON secret with two keys
 8. Application stack reached `CREATE_COMPLETE` in Mumbai.
 9. Production health endpoint returned HTTP 200 with `environment=production`.
 10. An unauthenticated copilot request returned HTTP 401 before Lambda application logic was exposed.
-11. Sites runtime environment revision 5 connects the Hirova edge route to the AWS API; a new public Site version is required to activate it.
+11. Sites runtime environment revision 5 connected the Hirova edge route to the AWS API and was activated by the next public Site version.
+12. Sites version 20 deployed successfully and `https://hirova.in/` remained the effective canonical URL with HTTP 200.
+13. The edge copilot route returned HTTP 401 without a Hirova user session.
+14. AWS MCP verification confirmed Lambda `Active`, last update `Successful`, ARM64, 1024 MB, and 29-second timeout.
+15. ECR scan completed with no reported severity findings; repository tags are immutable and scan-on-push is active.
+16. CloudWatch alarm state is `OK` and Lambda log retention is 14 days.
+17. Post-deployment AWS plan remained FREE/ACTIVE, budget remained healthy, and reported actual spend remained USD 0. Promotional credits reported USD 140 after AWS applied the account credit update.
