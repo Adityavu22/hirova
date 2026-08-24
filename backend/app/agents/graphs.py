@@ -84,7 +84,11 @@ def build_agentic_rag_graph(llm: LLMGateway | None = None, vector_store: CareerV
 
     async def answer(state: CareerState) -> dict:
         context = state.get("retrieved_context", [])
-        fallback = "I do not have enough relevant evidence to answer confidently. Add your target role, skills, or a matching job, then ask again."
+        if context:
+            evidence = str(context[0].get("text", "")).strip()
+            fallback = f"Based on your supplied career evidence: {evidence} Next action: verify this evidence against the target role and update your application materials."
+        else:
+            fallback = "I do not have enough relevant evidence to answer confidently. Add your target role, skills, or a matching job, then ask again."
         prompt = f"Question: {state.get('question')}\nCareer context: {json.dumps(context, default=str)}"
         response = await llm.generate("You are a concise career copilot. Use only supplied context, state uncertainty, and give one concrete next action.", prompt, fallback)
         sources = [{"id": item.get("id"), "title": item.get("title", "Career context"), "score": item.get("score")} for item in context]
