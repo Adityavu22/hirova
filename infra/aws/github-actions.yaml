@@ -8,6 +8,12 @@ Parameters:
   GitHubRepository:
     Type: String
     Default: hirova
+  GitHubOrganizationId:
+    Type: String
+    Default: "54681383"
+  GitHubRepositoryId:
+    Type: String
+    Default: "1340199970"
   LambdaFunctionName:
     Type: String
     MinLength: 1
@@ -42,10 +48,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                token.actions.githubusercontent.com:sub:
-                  - !Sub repo:${GitHubOrganization}/${GitHubRepository}:*
-                  - !Sub repo:adityavu22/${GitHubRepository}:*
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrganization}@${GitHubOrganizationId}/${GitHubRepository}@${GitHubRepositoryId}:ref:refs/heads/main
       Policies:
         - PolicyName: PushHirovaLambdaImage
           PolicyDocument:
