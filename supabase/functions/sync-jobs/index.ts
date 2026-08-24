@@ -38,6 +38,12 @@ Deno.serve(async (request: Request) => {
   if (!supabaseUrl || !secretKey) return json({ error: "Supabase runtime credentials unavailable" }, 500);
 
   const startedAt = new Date().toISOString();
+  // 1. Close orphaned runs left behind when an Edge Function is terminated by a platform limit.
+  await rest(supabaseUrl, secretKey, `job_sync_runs?status=eq.running&started_at=lt.${encodeURIComponent(new Date(Date.now() - 10 * 60_000).toISOString())}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "failed", completed_at: startedAt, error_summary: "Previous worker terminated before completion" }),
+    headers: { Prefer: "return=minimal" },
+  });
   const run = await rest<{ id: string }[]>(supabaseUrl, secretKey, "job_sync_runs", {
     method: "POST", body: JSON.stringify({ status: "running", started_at: startedAt }),
     headers: { Prefer: "return=representation" },
@@ -45,20 +51,20 @@ Deno.serve(async (request: Request) => {
   const runId = run[0]?.id;
 
   try {
-    // 1. Fetch documented feeds concurrently; one failed publisher does not discard healthy sources.
+    // 2. Fetch documented feeds with bounded concurrency so the Edge Function stays within memory limits.
     const loaders = [
-      ["Arbeitnow", loadArbeitnow()], ["Remotive", loadRemotive()],
-      ...GREENHOUSE_BOARDS.map(([company, token]) => [`${company} careers`, loadGreenhouse(company, token)] as const),
-      ...LEVER_BOARDS.map(([company, token]) => [`${company} careers`, loadLever(company, token)] as const),
-      ...ASHBY_BOARDS.map(([company, token]) => [`${company} careers`, loadAshby(company, token)] as const),
+      ["Arbeitnow", () => loadArbeitnow()], ["Remotive", () => loadRemotive()],
+      ...GREENHOUSE_BOARDS.map(([company, token]) => [`${company} careers`, () => loadGreenhouse(company, token)] as const),
+      ...LEVER_BOARDS.map(([company, token]) => [`${company} careers`, () => loadLever(company, token)] as const),
+      ...ASHBY_BOARDS.map(([company, token]) => [`${company} careers`, () => loadAshby(company, token)] as const),
     ] as const;
-    const settled = await Promise.allSettled(loaders.map(([, promise]) => promise));
+    const settled = await settleInBatches(loaders.map(([, load]) => load), 6);
     const jobs = dedupe(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
     const failures = settled.flatMap((result, index) => result.status === "rejected" ? [loaders[index][0]] : []);
     const succeeded = loaders.length - failures.length;
     if (!jobs.length) throw new Error("Every configured job source failed");
 
-    // 2. Upsert in bounded batches using the function-only secret key; browsers never receive it.
+    // 3. Upsert in bounded batches using the function-only secret key; browsers never receive it.
     for (let index = 0; index < jobs.length; index += 250) {
       await rest(supabaseUrl, secretKey, "job_market?on_conflict=id", {
         method: "POST",
@@ -67,7 +73,7 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    // 3. Expire missing jobs only after every source succeeded; partial outages preserve prior listings for 72 hours.
+    // 4. Expire missing jobs only after every source succeeded; partial outages preserve prior listings for 72 hours.
     if (!failures.length) {
       await rest(supabaseUrl, secretKey, `job_market?origin=eq.aggregated&active=eq.true&last_seen_at=lt.${encodeURIComponent(startedAt)}`, {
         method: "PATCH", body: JSON.stringify({ active: false }), headers: { Prefer: "return=minimal" },
@@ -174,6 +180,13 @@ async function finishRun(url: string, key: string, id: string, status: string, j
 }
 
 function getSecretKey() { const modern = Deno.env.get("SUPABASE_SECRET_KEYS"); if (modern) { const keys = JSON.parse(modern); if (keys.default) return keys.default; } return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); }
+async function settleInBatches<T>(loaders: Array<() => Promise<T>>, size: number): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = [];
+  for (let index = 0; index < loaders.length; index += size) {
+    results.push(...await Promise.allSettled(loaders.slice(index, index + size).map((load) => load())));
+  }
+  return results;
+}
 function dedupe(jobs: NormalizedJob[]) { const seen = new Set<string>(); return jobs.filter((job) => { const key = `${job.company}|${job.title}|${job.location}`.toLowerCase().replace(/\s+/g, " "); if (seen.has(key)) return false; seen.add(key); return true; }); }
 function inferSkills(value: string) { const bank = ["Python","JavaScript","TypeScript","React","Node.js","Java","Go","SQL","AWS","Azure","GCP","Kubernetes","Machine learning","Product management","Product design","Figma","Data analysis","Sales","Marketing","Finance","Operations","Security"]; return bank.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i").test(value)); }
 function inferExperienceMeta(value: string) {

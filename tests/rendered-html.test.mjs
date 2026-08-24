@@ -65,7 +65,21 @@ test("loads India-first jobs from local employer boards", async () => {
   assert.match(portal, /useState\("India"\)/);
   for (const token of ["acceldata", "saviynt", "100ms", "neuron7", "fampay", "hevodata", "gushwork", "paytm", "meesho", "cred", "porter", "slice", "inmobi", "spotdraft", "sarvam", "kraftonindia", "sigmoid", "capco", "zinnov", "alphasenseindia", "rapidai", "sitetracker", "bolna", "libra"]) assert.match(sync, new RegExp(`"${token}"`));
   assert.match(sync, /const ASHBY_BOARDS/);
+  assert.match(sync, /settleInBatches\(loaders\.map/);
+  assert.match(sync, /Previous worker terminated before completion/);
   assert.equal((sync.match(/\["[^"]+",\s*"[^"]+"\]/g) || []).length, 54);
+});
+
+test("deploys the AI backend through keyless GitHub OIDC", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const oidc = await readFile(new URL("../infra/aws/github-actions.yaml", import.meta.url), "utf8");
+  assert.match(workflow, /id-token:\s*write/);
+  assert.match(workflow, /configure-aws-credentials@v4/);
+  assert.match(workflow, /--provenance=false/);
+  assert.match(workflow, /lambda update-function-code/);
+  assert.match(oidc, /token\.actions\.githubusercontent\.com:sub/);
+  assert.match(oidc, /repo:\$\{GitHubOrganization\}\/\$\{GitHubRepository\}:ref:refs\/heads\/main/);
+  assert.doesNotMatch(workflow, /AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY/);
 });
 
 test("protects recruiter-owned company listings", async () => {

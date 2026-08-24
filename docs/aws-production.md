@@ -30,6 +30,7 @@ The following resources are created through `infra/aws/template.yaml` and the SA
 | Amazon CloudWatch Alarm | API 5xx production alarm | Live |
 | AWS Secrets Manager | `hirova/production/ai-runtime`; Groq and Qdrant credentials | Live |
 | AWS CloudFormation/SAM | `hirova-production-bootstrap` and `hirova-production-ai` stacks | Live |
+| AWS IAM OIDC | `hirova-github-production-deploy`; GitHub main-branch deployments without stored AWS keys | Live |
 
 Hirova keeps its public web experience and marketplace data on the existing edge and Supabase services. AWS hosts only the authenticated AI copilot API. This split avoids migrating working production data and prevents an idle server from running continuously.
 
@@ -75,3 +76,12 @@ The deployment references one existing Secrets Manager JSON secret with two keys
 15. ECR scan completed with no reported severity findings; repository tags are immutable and scan-on-push is active.
 16. CloudWatch alarm state is `OK` and Lambda log retention is 14 days.
 17. Post-deployment AWS plan remained FREE/ACTIVE, budget remained healthy, and reported actual spend remained USD 0. Promotional credits reported USD 140 after AWS applied the account credit update.
+18. `hirova-github-deployment` created a main-branch-only GitHub OIDC trust and a role limited to the Hirova ECR repository and Lambda image update.
+19. GitHub Actions repository variables configure the role, Mumbai region, ECR repository, and Lambda function without storing AWS access keys.
+20. After frontend, backend, container, and infrastructure checks pass on `main`, CI builds a single-manifest ARM64 image, pushes an immutable commit tag, resolves its digest, updates Lambda, and waits for a successful deployment.
+
+## Daily job refresh
+
+Supabase Cron invokes the authenticated `sync-jobs` Edge Function every day at `01:15 UTC`. Version 6 processes public feeds and employer boards in batches of six, preventing the memory spike that terminated versions running every source concurrently. It also closes orphaned telemetry rows from interrupted workers.
+
+The repaired production run completed with HTTP 200, indexed 6,865 jobs, and reported 56 successful sources with zero failed sources. Job search continues to expose application URLs only to authenticated users.

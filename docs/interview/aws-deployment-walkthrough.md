@@ -71,5 +71,7 @@ Hirova ka public web application existing edge hosting aur Supabase par chalta h
 10. Hirova hosting environment mein AWS API base URL configure karke edge proxy integration prepare ki.
 11. Public Site version deploy karke `hirova.in` ko canonical URL ke roop mein HTTP 200 verify kiya; unauthenticated edge copilot HTTP 401 raha.
 12. AWS MCP se independent post-deployment audit kiya: Lambda active, ECR scan complete with no findings, CloudWatch alarm OK, logs 14 days, AWS spend USD 0.
+13. GitHub Actions ke liye OIDC trust banaya. Workflow mein long-lived AWS access keys nahi hain; sirf `main` branch temporary role assume karke Hirova ECR aur Lambda update kar sakti hai.
+14. Daily job sync mein 56 parallel source requests Edge Function resource limit hit kar rahe the. Concurrency six par bound ki, stale telemetry cleanup add ki, version 6 deploy ki aur 6,865 jobs plus 56/56 sources ke saath HTTP 200 verify kiya.
 
 Further verified deployment events will be appended here.
