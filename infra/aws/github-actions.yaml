@@ -43,7 +43,9 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrganization}/${GitHubRepository}:*
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubOrganization}/${GitHubRepository}:*
+                  - !Sub repo:adityavu22/${GitHubRepository}:*
       Policies:
         - PolicyName: PushHirovaLambdaImage
           PolicyDocument:
