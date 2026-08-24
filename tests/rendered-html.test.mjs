@@ -78,7 +78,7 @@ test("deploys the AI backend through keyless GitHub OIDC", async () => {
   assert.match(workflow, /--provenance=false/);
   assert.match(workflow, /lambda update-function-code/);
   assert.match(oidc, /token\.actions\.githubusercontent\.com:sub/);
-  assert.match(oidc, /repo:\$\{GitHubOrganization\}\/\$\{GitHubRepository\}:ref:refs\/heads\/main/);
+  assert.match(oidc, /repo:\$\{GitHubOrganization\}\/\$\{GitHubRepository\}:\*/);
   assert.doesNotMatch(workflow, /AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY/);
 });
 
