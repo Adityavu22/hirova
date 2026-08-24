@@ -18,10 +18,11 @@ configure_observability(settings)
 async def lifespan(_: FastAPI):
     """1. Local auto-create makes onboarding easy; production uses Alembic migrations."""
 
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    async with SessionLocal() as session:
-        await seed_database(session)
+    if settings.bootstrap_database:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            await seed_database(session)
     yield
     await engine.dispose()
 

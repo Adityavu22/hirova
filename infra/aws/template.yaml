@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Hirova authenticated AI backend - uses a bounded serverless API to keep
+  idle cost and operational overhead low.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@2
+  com.aws.cloudformation.Context:
+    arch: hirova.in edge -> HTTP API JWT auth -> Lambda -> Groq & Qdrant
+    must:
+      - Deploy in ap-south-1 unless extension ARNs and latency assumptions are reviewed
+      - Keep public health route read-only; copilot route requires Supabase JWT
+      - Keep API request throttling bounded while account is on free plan
+    ref:
+      - at: docs/aws-production.md
+        has: deploy flow, cost boundary, rollback
+        scope: repo
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+  SupabaseUrl:
+    Type: String
+    AllowedPattern: ^https://[a-z0-9]+\.supabase\.co$
+    ConstraintDescription: Must be an HTTPS Supabase project URL.
+  SupabasePublishableKey:
+    Type: String
+    MinLength: 20
+  RuntimeSecretId:
+    Type: String
+    MinLength: 1
+    Description: Existing Secrets Manager name or ARN containing groq_api_key and qdrant_api_key.
+  QdrantUrl:
+    Type: String
+    AllowedPattern: ^https://.+$
+    ConstraintDescription: Must be an HTTPS Qdrant cluster URL.
+  LambdaImageUri:
+    Type: String
+    MinLength: 1
+    Description: Immutable ECR image URI, preferably pinned by digest.
+  GroqModel:
+    Type: String
+    Default: openai/gpt-oss-120b
+    AllowedValues:
+      - openai/gpt-oss-120b
+
+Resources:
+  HirovaApi:
+    Type: AWS::Serverless::HttpApi
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: regional public ingress; HTTP API over REST API for lower request cost; JWT checked before Lambda
+        must:
+          - Supabase issuer and authenticated audience must match production project
+          - Only explicitly declared routes may invoke backend
+        mutable: change-with-constraints
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - https://hirova.in
+          - https://www.hirova.in
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        MaxAge: 600
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 1
+        ThrottlingBurstLimit: 2
+      Auth:
+        DefaultAuthorizer: SupabaseJwt
+        Authorizers:
+          SupabaseJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub ${SupabaseUrl}/auth/v1
+              audience:
+                - authenticated
+
+  HirovaAiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: FastAPI agentic RAG endpoint; Lambda over always-on compute for bursty early-stage traffic
+        must:
+          - Secrets resolve from existing Secrets Manager JSON; never commit or pass plaintext parameters
+          - API throttling stays bounded until budget and load tests justify an increase
+          - Timeout remains below HTTP API integration ceiling
+        mutable: change-with-constraints
+        mutability:
+          MemorySize: review-required
+    Properties:
+      PackageType: Image
+      ImageUri: !Ref LambdaImageUri
+      Architectures:
+        - arm64
+      MemorySize: 1024
+      Timeout: 29
+      Environment:
+        Variables:
+          APP_NAME: Hirova API
+          ENVIRONMENT: !Ref Environment
+          CORS_ORIGINS: https://hirova.in,https://www.hirova.in
+          BOOTSTRAP_DATABASE: "false"
+          LLM_PROVIDER: groq
+          GROQ_MODEL: !Ref GroqModel
+          GROQ_API_KEY: !Sub "{{resolve:secretsmanager:${RuntimeSecretId}:SecretString:groq_api_key}}"
+          QDRANT_URL: !Ref QdrantUrl
+          QDRANT_API_KEY: !Sub "{{resolve:secretsmanager:${RuntimeSecretId}:SecretString:qdrant_api_key}}"
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_PUBLISHABLE_KEY: !Ref SupabasePublishableKey
+          LANGSMITH_TRACING: "false"
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HirovaApi
+            Path: /api/v1/health
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        Copilot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HirovaApi
+            Path: /api/v1/copilot/ask
+            Method: POST
+
+  HirovaAiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: short retention supports debugging without unbounded storage cost
+        must:
+          - Never log authorization headers, resume text, or provider keys
+        mutable: free-to-tune
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${HirovaAiFunction}
+      RetentionInDays: 14
+
+  HirovaApi5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: detects sustained server failures without paid notification wiring
+        must:
+          - Treat ALARM state as release rollback signal
+        mutable: free-to-tune
+    Properties:
+      AlarmDescription: Hirova API server errors exceeded the production threshold.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HirovaApi
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  ApiBaseUrl:
+    Description: Private integration target used only by the Hirova edge route.
+    Value: !Sub https://${HirovaApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  FunctionName:
+    Description: Lambda function name for operational checks.
+    Value: !Ref HirovaAiFunction

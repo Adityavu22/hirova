@@ -6,12 +6,19 @@ from app.main import app
 
 def test_health_and_copilot_routes() -> None:
     # 1. Smoke-test lifespan, database seed, and agentic RAG endpoint together.
-    with TestClient(app) as client:
-        health = client.get("/api/v1/health")
-        assert health.status_code == 200
-        answer = client.post("/api/v1/copilot/ask", json={"question":"Which role fits me best?", "candidate_id":"demo-user"})
-        assert answer.status_code == 200
-        assert answer.json()["mode"] == "demo"
+    async def authenticated_candidate() -> CurrentUser:
+        return CurrentUser(id="copilot-test", email="copilot@example.com", name="Copilot Test")
+
+    app.dependency_overrides[get_current_user] = authenticated_candidate
+    try:
+        with TestClient(app) as client:
+            health = client.get("/api/v1/health")
+            assert health.status_code == 200
+            answer = client.post("/api/v1/copilot/ask", json={"question": "Which role fits me best?"})
+            assert answer.status_code == 200
+            assert answer.json()["mode"] == "demo"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_authenticated_candidate_workspace_round_trip() -> None:

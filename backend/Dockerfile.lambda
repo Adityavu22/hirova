@@ -1,0 +1,9 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+# 1. Install dependencies separately so application-only changes reuse the cached layer.
+COPY requirements.lambda.txt ${LAMBDA_TASK_ROOT}/requirements.lambda.txt
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.lambda.txt
+
+# 2. Lambda invokes the Mangum adapter; the FastAPI application remains framework-native.
+COPY app ${LAMBDA_TASK_ROOT}/app
+CMD ["app.lambda_handler.handler"]

@@ -16,6 +16,7 @@ langchain-google-genai>=2,<5
 qdrant-client>=1.13,<2
 tenacity>=9,<10
 httpx>=0.28,<1
+mangum>=0.19,<1
 pytest>=8,<10
 pytest-asyncio>=0.24,<2
 ruff>=0.9,<1

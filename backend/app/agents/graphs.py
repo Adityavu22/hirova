@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from typing import Literal
@@ -6,7 +7,6 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.state import CareerState
 from app.agents.tools import build_star_rubric, evidence_overlap, extract_required_skills
-from app.services.ingestion import analyze_resume
 from app.services.llm import LLMGateway
 from app.services.vector_store import CareerVectorStore
 
@@ -17,6 +17,9 @@ def build_resume_subgraph() -> StateGraph:
     graph = StateGraph(CareerState)
 
     async def analyze(state: CareerState) -> dict:
+        # Resume parsers are loaded only by the full backend, not the minimal Lambda copilot.
+        from app.services.ingestion import analyze_resume
+
         return {"resume_analysis": analyze_resume(state.get("resume_text", ""))}
 
     graph.add_node("analyze_resume", analyze)
@@ -62,9 +65,11 @@ def build_agentic_rag_graph(llm: LLMGateway | None = None, vector_store: CareerV
         return {"rewritten_question": rewritten, "retrieval_attempts": state.get("retrieval_attempts", 0) + 1}
 
     async def retrieve(state: CareerState) -> dict:
+        owner_hash = hashlib.sha256(state.get("candidate_id", "anonymous").encode()).hexdigest()[:24]
+        collection = f"career_knowledge_{owner_hash}"
         for index, item in enumerate(state.get("knowledge", [])):
-            await store.upsert("career_knowledge", str(item.get("id", index)), str(item.get("text", "")), item)
-        hits = await store.search("career_knowledge", state.get("rewritten_question") or state.get("question", ""), limit=4)
+            await store.upsert(collection, str(item.get("id", index)), str(item.get("text", "")), item)
+        hits = await store.search(collection, state.get("rewritten_question") or state.get("question", ""), limit=4)
         context = [{**hit.payload, "score": round(hit.score, 3)} for hit in hits if hit.score > 0]
         return {"retrieved_context": context}
 
@@ -79,7 +84,7 @@ def build_agentic_rag_graph(llm: LLMGateway | None = None, vector_store: CareerV
 
     async def answer(state: CareerState) -> dict:
         context = state.get("retrieved_context", [])
-        fallback = "Mercury Labs is the strongest near-term fit. Your design-systems and fintech evidence explain the high match; quantify one shipped outcome before applying."
+        fallback = "I do not have enough relevant evidence to answer confidently. Add your target role, skills, or a matching job, then ask again."
         prompt = f"Question: {state.get('question')}\nCareer context: {json.dumps(context, default=str)}"
         response = await llm.generate("You are a concise career copilot. Use only supplied context, state uncertainty, and give one concrete next action.", prompt, fallback)
         sources = [{"id": item.get("id"), "title": item.get("title", "Career context"), "score": item.get("score")} for item in context]

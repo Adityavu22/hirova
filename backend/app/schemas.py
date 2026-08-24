@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -66,7 +66,7 @@ class InterviewRequest(BaseModel):
 
 class CopilotRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2_000)
-    candidate_id: str = "demo-user"
+    knowledge: list[dict[str, Any]] = Field(default_factory=list, max_length=25)
 
 
 class CopilotResponse(BaseModel):

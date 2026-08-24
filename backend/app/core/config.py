@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     llm_provider: Literal["groq", "gemini", "demo"] = "demo"
     groq_api_key: str | None = None
     gemini_api_key: str | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     gemini_model: str = "gemini-2.5-flash"
     supabase_url: str | None = None
     supabase_publishable_key: str | None = None
@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     langsmith_api_key: str | None = None
     langsmith_project: str = "hirova-career-copilot"
     max_upload_mb: int = 10
+    bootstrap_database: bool = True
 
     @property
     def origins(self) -> list[str]:

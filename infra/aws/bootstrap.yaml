@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Hirova deployment bootstrap resources - container registry and retained runtime secret.
+
+Resources:
+  HirovaLambdaRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: hirova-ai-lambda
+      EmptyOnDelete: false
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Retain only the newest five production images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {"type": "expire"}
+              }
+            ]
+          }
+
+  HirovaRuntimeSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: hirova/production/ai-runtime
+      Description: Hirova production Groq and Qdrant runtime credentials.
+      KmsKeyId: alias/aws/secretsmanager
+      SecretString: '{"provisioning_state":"replace-before-runtime-deploy"}'
+
+Outputs:
+  RepositoryUri:
+    Description: ECR repository used for the Hirova Lambda image.
+    Value: !GetAtt HirovaLambdaRepository.RepositoryUri
+  RuntimeSecretId:
+    Description: Secrets Manager identifier referenced by the application stack.
+    Value: !Ref HirovaRuntimeSecret

@@ -1,0 +1,9 @@
+fastapi>=0.115,<1
+pydantic-settings>=2.6,<3
+langchain-core>=0.3,<2
+langgraph>=0.4,<2
+langchain-groq>=0.3,<2
+qdrant-client>=1.13,<2
+tenacity>=9,<10
+httpx>=0.28,<1
+mangum>=0.19,<1
